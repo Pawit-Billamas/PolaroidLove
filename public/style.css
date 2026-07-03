@@ -153,23 +153,52 @@ body{
 /* ---------------- Design screen ---------------- */
 .group-label{font-family:var(--font-display);font-weight:700;font-size:0.9rem;margin:20px 0 10px;color:var(--ink);}
 
-.shape-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.shape-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
 .shape-card{
   background:var(--cream-soft);border:2px solid transparent;border-radius:var(--radius-md);
   padding:10px 6px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;
   font-size:0.72rem;font-weight:700;color:var(--ink);cursor:pointer;box-shadow:var(--shadow-soft);
 }
 .shape-card.selected{border-color:var(--pink-button);}
-.shape-preview{width:56px;height:56px;display:flex;align-items:center;justify-content:center;gap:4px;}
-.shape-preview--classic span{
-  width:44px;height:44px;border-radius:10px;background:var(--blush);border:3px solid var(--pink-button);
+.shape-preview{width:56px;height:56px;display:flex;align-items:center;justify-content:center;gap:4px;position:relative;}
+
+/* Washi Strip — two stacked frames with a torn tape accent */
+.shape-preview--washi{flex-direction:column;gap:3px;}
+.shape-preview--washi span{
+  width:40px;height:19px;border-radius:2px;background:var(--blush);border:2px solid var(--pink-button);
 }
-.shape-preview--duo span{
-  width:20px;height:44px;border-radius:8px;background:var(--blush);border:3px solid var(--pink-button);
+.shape-preview--washi .tape{
+  position:absolute;top:-3px;left:50%;transform:translateX(-50%) rotate(-4deg);
+  width:26px;height:9px;background:var(--sky-deep);opacity:0.85;border-radius:1px;font-style:normal;
 }
-.shape-preview--bloom span{
-  width:46px;height:46px;background:var(--blush);border:3px solid var(--pink-button);
-  border-radius:63% 37% 54% 46% / 55% 48% 52% 45%;
+
+/* Filmstrip — sprocket bands top/bottom, two frames side by side */
+.shape-preview--filmstrip{position:relative;padding:8px 0;}
+.shape-preview--filmstrip span{
+  width:19px;height:34px;background:var(--blush);border:2px solid var(--ink);
+}
+.shape-preview--filmstrip .sprocket{
+  position:absolute;left:0;right:0;height:7px;background:var(--ink);font-style:normal;
+}
+.shape-preview--filmstrip .sprocket.top{top:0;}
+.shape-preview--filmstrip .sprocket.bottom{bottom:0;}
+
+/* Scrapbook Pop — two tilted overlapping snapshots + a star sticker */
+.shape-preview--scrapbook{position:relative;}
+.shape-preview--scrapbook span{
+  position:absolute;width:30px;height:30px;background:var(--blush);border:3px solid #fff;
+  box-shadow:0 2px 6px rgba(26,19,16,0.25);border-radius:2px;
+}
+.shape-preview--scrapbook span:first-child{transform:rotate(-8deg);top:6px;left:6px;}
+.shape-preview--scrapbook span:last-child{transform:rotate(7deg);top:16px;left:18px;}
+.shape-preview--scrapbook .star{
+  position:absolute;top:-2px;right:-2px;font-style:normal;color:var(--pink-button);font-size:0.85rem;
+}
+
+/* Heart Cutout — merged photo cropped into a heart */
+.shape-preview--heart span{
+  width:44px;height:40px;background:var(--blush);border:3px solid var(--pink-button);
+  clip-path:path('M22 38C22 38 3 26 3 13C3 5 9 1 15 1C18.5 1 22 4 22 8C22 4 25.5 1 29 1C35 1 41 5 41 13C41 26 22 38 22 38Z');
 }
 
 .color-row{display:flex;gap:14px;}

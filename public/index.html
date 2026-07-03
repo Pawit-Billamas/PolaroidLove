@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<title>Together Booth — take a polaroid with someone, anywhere</title>
+<title>Polaroid Love — take a polaroid with someone, anywhere</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Beau+Rivage&family=Poppins:wght@500;600;700;800&family=Nunito+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
@@ -18,7 +18,7 @@
       <span class="brand-mark" aria-hidden="true">
         <svg viewBox="0 0 32 32" width="22" height="22"><circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="16" cy="16" r="5" fill="currentColor"/></svg>
       </span>
-      Together <span class="script">Booth</span>
+      Polaroid <span class="script">Love</span>
     </div>
     <div class="topbar-status" id="topbar-status" hidden>
       <span class="dot" id="conn-dot"></span>
@@ -70,17 +70,21 @@
 
       <h3 class="group-label">Frame shape</h3>
       <div class="shape-grid" id="shape-grid">
-        <button class="shape-card selected" data-shape="classic">
-          <span class="shape-preview shape-preview--classic"><span></span></span>
-          Classic Modern
+        <button class="shape-card selected" data-shape="washi">
+          <span class="shape-preview shape-preview--washi"><span></span><span></span><i class="tape"></i></span>
+          Washi Strip
         </button>
-        <button class="shape-card" data-shape="duo">
-          <span class="shape-preview shape-preview--duo"><span></span><span></span></span>
-          Studio Duo
+        <button class="shape-card" data-shape="filmstrip">
+          <span class="shape-preview shape-preview--filmstrip"><i class="sprocket top"></i><span></span><span></span><i class="sprocket bottom"></i></span>
+          Filmstrip
         </button>
-        <button class="shape-card" data-shape="bloom">
-          <span class="shape-preview shape-preview--bloom"><span></span></span>
-          Bloom Cutout
+        <button class="shape-card" data-shape="scrapbook">
+          <span class="shape-preview shape-preview--scrapbook"><span></span><span></span><i class="star">✦</i></span>
+          Scrapbook Pop
+        </button>
+        <button class="shape-card" data-shape="heart">
+          <span class="shape-preview shape-preview--heart"><span></span></span>
+          Heart Cutout
         </button>
       </div>
 
@@ -91,7 +95,7 @@
         <button class="color-swatch" data-color="leaf" style="--sw:#3F8A2E;"><span class="sr-only">Leaf</span></button>
       </div>
 
-      <div id="split-row">
+      <div id="split-row" style="display:none;">
         <h3 class="group-label">Split direction</h3>
         <div class="split-options">
           <button class="split-opt selected" data-split="side">

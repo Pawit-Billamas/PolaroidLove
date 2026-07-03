@@ -60,5 +60,5 @@ peerServer.on('disconnect', (client) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Photobooth Together listening on port ${PORT}`);
+  console.log(`Polaroid Love listening on port ${PORT}`);
 });

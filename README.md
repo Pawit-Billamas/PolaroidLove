@@ -1,4 +1,4 @@
-# Together Booth 💌
+# Polaroid Love 💌
 
 A polaroid photobooth for two — on two separate devices, anywhere.
 
@@ -12,7 +12,7 @@ into a canvas, producing an identical polaroid keepsake for each of you.
 ## What's inside
 
 ```
-photobooth-together/
+polaroid-love/
 ├── server.js          Express server + self-hosted WebRTC signaling (PeerJS)
 ├── package.json
 ├── public/
@@ -30,18 +30,16 @@ accent font (`Beau Rivage`) paired with a bold geometric sans (`Poppins`) for
 headings and `Nunito Sans` for body text. Button/background color pairs were
 checked against WCAG contrast so text stays readable.
 
-### The polaroid frame, modernized
-Three frame shapes, each in your choice of pink / sky / leaf accent:
-- **Classic Modern** — one merged photo, split down the middle or across,
-  in a rounded card with a thin double ring border.
-- **Studio Duo** — two separate square frames stacked like a real two-frame
-  photobooth strip, with a perforated tear line between them.
-- **Bloom Cutout** — the merged photo cropped into a soft organic blob shape
-  with a thin colored ring outline, echoing the product-card shapes on the
-  mood board.
-
-All three use a plain, modern caption bar (no stickers/washi tape/grain) —
-just a small color dot, your caption, and the date.
+### The polaroid frame, with personality
+Four frame shapes, each in your choice of pink / sky / leaf accent:
+- **Washi Strip** — a tall two-frame photobooth strip with a torn piece of
+  washi tape across the top and a flowing script caption underneath.
+- **Filmstrip** — a retro film-reel band with sprocket holes top and bottom,
+  two lightly desaturated frames side by side, and a stamped circle caption.
+- **Scrapbook Pop** — two tilted, white-bordered snapshots overlapping on a
+  soft gingham-grid card, with star stickers and a scalloped caption patch.
+- **Heart Cutout** — the merged photo cropped into a heart shape with a
+  dotted stitched outline, split down the middle or across.
 
 ## How the two-device connection works
 
@@ -70,7 +68,7 @@ to spot-check it yourself after deploying.
 You'll need [Node.js](https://nodejs.org) 18 or newer.
 
 ```bash
-cd photobooth-together
+cd polaroid-love
 npm install
 npm start
 ```
@@ -87,17 +85,17 @@ on one machine works fine without it.
 If your project isn't already a git repo:
 
 ```bash
-cd photobooth-together
+cd polaroid-love
 git init
 git add .
-git commit -m "Together Booth"
+git commit -m "Polaroid Love"
 ```
 
 Create a new empty repository on [github.com/new](https://github.com/new),
 then:
 
 ```bash
-git remote add origin https://github.com/<your-username>/together-booth.git
+git remote add origin https://github.com/<your-username>/polaroid-love.git
 git branch -M main
 git push -u origin main
 ```
@@ -110,15 +108,15 @@ commands below.
 1. Go to [render.com](https://render.com) and sign up / log in (you can use
    your GitHub account).
 2. Click **New → Web Service**.
-3. Connect your GitHub account and select the `together-booth` repo.
+3. Connect your GitHub account and select the `polaroid-love` repo.
 4. Fill in:
-   - **Name**: anything, e.g. `together-booth`
+   - **Name**: anything, e.g. `polaroid-love`
    - **Region**: closest to you or your partner
    - **Build Command**: `npm install`
    - **Start Command**: `npm start`
    - **Instance Type**: **Free**
 5. Click **Create Web Service**. Render will build and deploy — you'll get
-   a live URL like `https://together-booth.onrender.com` in a minute or two.
+   a live URL like `https://polaroid-love.onrender.com` in a minute or two.
 6. Open that URL — camera access requires HTTPS in every browser except on
    `localhost`, and Render gives you HTTPS automatically, so you're covered.
 
@@ -189,6 +187,7 @@ Once it's live:
   `app.js`'s `drawCaptionBar()` in sync if you change the display font.
 - **Room code words** — the `ROOM_WORDS` list near the top of `app.js`.
 - **Frame shapes** — each shape has its own `render*()` function in
-  `app.js` (`renderClassicModern`, `renderBloomCutout`, `renderStudioDuo`);
-  the blob outline itself is the `BLOB_POINTS` array, in case you want a
-  different organic shape.
+  `app.js` (`renderWashiStrip`, `renderFilmstrip`, `renderScrapbookPop`,
+  `renderHeartCutout`), registered in the `FRAME_RENDERERS` map; the heart
+  outline itself is drawn by `heartPath()`, in case you want a different
+  cutout shape.

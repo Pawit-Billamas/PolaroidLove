@@ -1,5 +1,5 @@
 // public/app.js
-// Together Booth — client logic.
+// Polaroid Love — client logic.
 //
 // Two devices, one photo:
 //  - The "host" picks the frame + creates a short room code.
@@ -33,9 +33,9 @@
   const state = {
     role: 'host',            // 'host' | 'guest'
     roomCode: null,
-    shape: 'classic',        // 'classic' | 'duo' | 'bloom'
+    shape: 'washi',          // 'washi' | 'filmstrip' | 'scrapbook' | 'heart'
     accent: 'pink',          // 'pink' | 'sky' | 'leaf'
-    split: 'side',           // 'side' | 'top'  (ignored for 'duo')
+    split: 'side',           // 'side' | 'top'  (ignored for 'washi'/'filmstrip')
     peer: null,
     dataConn: null,
     localStream: null,
@@ -108,7 +108,7 @@
       state.shape = card.dataset.shape;
       document.querySelectorAll('.shape-card').forEach((c) => c.classList.remove('selected'));
       card.classList.add('selected');
-      $('split-row').style.display = state.shape === 'duo' ? 'none' : '';
+      $('split-row').style.display = state.shape === 'heart' ? '' : 'none';
     });
   });
 
@@ -399,25 +399,60 @@
     ctx.closePath();
   }
 
-  // A fixed, hand-tuned organic blob path (normalized to a 0..1 box),
-  // reused every render so host and guest always draw the identical shape.
-  const BLOB_POINTS = [
-    [0.50, 0.02], [0.78, 0.08], [0.95, 0.32], [0.94, 0.60],
-    [0.80, 0.85], [0.52, 0.97], [0.22, 0.90], [0.05, 0.66],
-    [0.06, 0.36], [0.24, 0.10]
-  ];
-  function blobPath(ctx, x, y, w, h) {
-    const pts = BLOB_POINTS.map(([px, py]) => [x + px * w, y + py * h]);
+  // A fixed, hand-tuned heart path (normalized to a 0..1 box), reused every
+  // render so host and guest always draw the identical shape.
+  function heartPath(ctx, x, y, w, h) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(w / 100, h / 100);
     ctx.beginPath();
-    ctx.moveTo((pts[0][0] + pts[pts.length - 1][0]) / 2, (pts[0][1] + pts[pts.length - 1][1]) / 2);
-    for (let i = 0; i < pts.length; i++) {
-      const cur = pts[i];
-      const next = pts[(i + 1) % pts.length];
-      const midX = (cur[0] + next[0]) / 2;
-      const midY = (cur[1] + next[1]) / 2;
-      ctx.quadraticCurveTo(cur[0], cur[1], midX, midY);
-    }
+    ctx.moveTo(50, 88);
+    ctx.bezierCurveTo(50, 88, 6, 58, 6, 30);
+    ctx.bezierCurveTo(6, 10, 22, 2, 36, 2);
+    ctx.bezierCurveTo(44, 2, 50, 8, 50, 16);
+    ctx.bezierCurveTo(50, 8, 56, 2, 64, 2);
+    ctx.bezierCurveTo(78, 2, 94, 10, 94, 30);
+    ctx.bezierCurveTo(94, 58, 50, 88, 50, 88);
     ctx.closePath();
+    ctx.restore();
+  }
+
+  function drawTapePiece(ctx, cx, cy, w, h, rotDeg, hex) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((rotDeg * Math.PI) / 180);
+    ctx.globalAlpha = 0.82;
+    ctx.fillStyle = hex;
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.globalAlpha = 0.14;
+    ctx.fillStyle = '#FFFFFF';
+    for (let i = -w / 2; i < w / 2; i += 7) {
+      ctx.fillRect(i, -h / 2, 2, h);
+    }
+    ctx.restore();
+  }
+
+  function drawScriptCaption(ctx, cx, y, accentHex) {
+    const captionText = (state.caption && state.caption.trim()) ? state.caption.trim() : 'us, together';
+    ctx.save();
+    ctx.fillStyle = '#1A1310';
+    ctx.font = "400 44px 'Beau Rivage', cursive";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(captionText, cx, y);
+    ctx.restore();
+
+    if (state.showDate) {
+      ctx.save();
+      ctx.fillStyle = accentHex;
+      ctx.font = "700 15px 'Nunito Sans', sans-serif";
+      ctx.textAlign = 'center';
+      ctx.letterSpacing = '0.06em';
+      const today = new Date();
+      const dateStr = today.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: '2-digit' });
+      ctx.fillText(dateStr, cx, y + 30);
+      ctx.restore();
+    }
   }
 
   function drawCaptionBar(ctx, x, y, w, h, accentHex) {
@@ -443,143 +478,312 @@
       ctx.font = "500 15px 'Nunito Sans', sans-serif";
       ctx.textAlign = 'left';
       const today = new Date();
-      const dateStr = today.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+      const dateStr = today.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
       ctx.fillText(dateStr, x + 46, y + h * 0.72);
       ctx.restore();
     }
   }
 
-  function composeSplitSquare(photoA, photoB, size, split) {
-    const c = document.createElement('canvas');
-    c.width = size; c.height = size;
-    const ctx = c.getContext('2d');
-    if (split === 'side') {
-      ctx.drawImage(photoA, 0, 0, size / 2, size, 0, 0, size / 2, size);
-      ctx.drawImage(photoB, size / 2, 0, size / 2, size, size / 2, 0, size / 2, size);
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-      ctx.lineWidth = 4;
-      ctx.setLineDash([12, 10]);
-      ctx.beginPath(); ctx.moveTo(size / 2, 0); ctx.lineTo(size / 2, size); ctx.stroke();
-      ctx.restore();
-    } else {
-      ctx.drawImage(photoA, 0, 0, size, size / 2, 0, 0, size, size / 2);
-      ctx.drawImage(photoB, 0, size / 2, size, size / 2, 0, size / 2, size, size);
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-      ctx.lineWidth = 4;
-      ctx.setLineDash([12, 10]);
-      ctx.beginPath(); ctx.moveTo(0, size / 2); ctx.lineTo(size, size / 2); ctx.stroke();
-      ctx.restore();
+  // A little 5-point star, used as a cute sticker accent on the scrapbook frame.
+  function drawStar(ctx, cx, cy, r, hex, rotDeg) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((rotDeg * Math.PI) / 180);
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const outer = (i * 2 * Math.PI) / 5 - Math.PI / 2;
+      const inner = outer + Math.PI / 5;
+      const ox = Math.cos(outer) * r, oy = Math.sin(outer) * r;
+      const ix = Math.cos(inner) * r * 0.42, iy = Math.sin(inner) * r * 0.42;
+      if (i === 0) ctx.moveTo(ox, oy); else ctx.lineTo(ox, oy);
+      ctx.lineTo(ix, iy);
     }
-    return c;
+    ctx.closePath();
+    ctx.fillStyle = hex;
+    ctx.fill();
+    ctx.restore();
   }
 
-  function renderClassicModern(ctx, W, H, photoA, photoB, accentHex) {
-    const margin = 26;
-    const photoSize = W - margin * 2;
-    const capGap = 14;
-    const capBarH = 66;
+  /* ---------- 1. WASHI STRIP ----------
+     A tall photo-booth strip: two frames stacked full-bleed inside a white
+     card, a torn piece of washi tape at the top, and a flowing script
+     caption underneath — the "dinner party" strip look. */
+  function renderWashiStrip(ctx, W, H, photoA, photoB, accentHex) {
+    const margin = 24;
+    const photoW = W - margin * 2;
+    const gap = 10;
+    const photoH = (H - margin * 2 - gap * 3 - 118) / 2;
 
-    roundRectPath(ctx, 0, 0, W, H, 26);
-    ctx.fillStyle = '#FFFBF2';
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.18)';
+    ctx.shadowBlur = 2;
+    roundRectPath(ctx, 0, 0, W, H, 4);
+    ctx.fillStyle = '#FFFFFF';
     ctx.fill();
-
-    const combined = composeSplitSquare(photoA, photoB, photoSize, state.split);
-    roundRectPath(ctx, margin, margin, photoSize, photoSize, 16);
-    ctx.save();
-    ctx.clip();
-    ctx.drawImage(combined, margin, margin);
     ctx.restore();
-
-    // thin double ring
-    roundRectPath(ctx, margin, margin, photoSize, photoSize, 16);
-    ctx.save();
-    ctx.strokeStyle = accentHex;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.restore();
-    roundRectPath(ctx, margin + 6, margin + 6, photoSize - 12, photoSize - 12, 12);
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.restore();
-
-    drawCaptionBar(ctx, margin, margin + photoSize + capGap, photoSize, capBarH, accentHex);
-  }
-
-  function renderBloomCutout(ctx, W, H, photoA, photoB, accentHex) {
-    const margin = 22;
-    const blobBoxSize = W - margin * 2;
-    const capGap = 14;
-    const capBarH = 66;
-
-    roundRectPath(ctx, 0, 0, W, H, 26);
-    ctx.fillStyle = '#FFFBF2';
-    ctx.fill();
-
-    const combined = composeSplitSquare(photoA, photoB, blobBoxSize, state.split);
-    ctx.save();
-    blobPath(ctx, margin, margin, blobBoxSize, blobBoxSize);
-    ctx.clip();
-    ctx.drawImage(combined, margin, margin, blobBoxSize, blobBoxSize);
-    ctx.restore();
-
-    ctx.save();
-    blobPath(ctx, margin, margin, blobBoxSize, blobBoxSize);
-    ctx.strokeStyle = accentHex;
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    ctx.restore();
-
-    drawCaptionBar(ctx, margin, margin + blobBoxSize + capGap, blobBoxSize, capBarH, accentHex);
-  }
-
-  // Stacked vertically, like a real two-frame photobooth strip — this is
-  // also what keeps its width identical to the other two card styles,
-  // rather than an oddly squat side-by-side layout.
-  function renderStudioDuo(ctx, W, H, photoA, photoB, accentHex) {
-    const margin = 26;
-    const gap = 16;
-    const capGap = 14;
-    const capBarH = 66;
-    const frameSize = W - margin * 2;
-
-    roundRectPath(ctx, 0, 0, W, H, 26);
-    ctx.fillStyle = '#FFFBF2';
-    ctx.fill();
 
     [photoA, photoB].forEach((photo, i) => {
-      const y = margin + i * (frameSize + gap);
-      roundRectPath(ctx, margin, y, frameSize, frameSize, 16);
+      const y = margin + i * (photoH + gap);
       ctx.save();
+      ctx.beginPath();
+      ctx.rect(margin, y, photoW, photoH);
       ctx.clip();
-      ctx.drawImage(photo, 0, 0, photo.width, photo.height, margin, y, frameSize, frameSize);
-      ctx.restore();
-      roundRectPath(ctx, margin, y, frameSize, frameSize, 16);
-      ctx.save();
-      ctx.strokeStyle = accentHex;
-      ctx.lineWidth = 3;
-      ctx.stroke();
+      const side = Math.min(photo.width, photo.height);
+      const sx = (photo.width - side) / 2, sy = (photo.height - side) / 2;
+      const scale = Math.max(photoW / side, photoH / side);
+      const dw = side * scale, dh = side * scale;
+      ctx.drawImage(photo, sx, sy, side, side, margin + (photoW - dw) / 2, y + (photoH - dh) / 2, dw, dh);
       ctx.restore();
     });
 
-    // perforated seam between the two frames, like a tear-off photo strip
+    // torn washi tape across the top edge
+    drawTapePiece(ctx, W / 2, margin - 2, 150, 34, -3, accentHex);
+
+    drawScriptCaption(ctx, W / 2, H - 62, accentHex);
+  }
+
+  /* ---------- 2. FILMSTRIP ----------
+     Black film-reel bands with sprocket holes running along the top and
+     bottom, two frames side by side in the middle, and a circled "TEXT"
+     style stamped caption — the retro filmstrip collage look. */
+  function drawSprocketBand(ctx, x, y, w, h) {
     ctx.save();
-    ctx.strokeStyle = 'rgba(26,19,16,0.25)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([3, 6]);
+    ctx.fillStyle = '#171310';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#FFFBF2';
+    const holeW = 15, holeH = h * 0.5, gap = 26;
+    let hx = x + 14;
+    while (hx < x + w - 8) {
+      roundRectPath(ctx, hx, y + (h - holeH) / 2, holeW, holeH, 3);
+      ctx.fill();
+      hx += holeW + gap;
+    }
+    ctx.restore();
+  }
+
+  function renderFilmstrip(ctx, W, H, photoA, photoB, accentHex) {
+    const bandH = 30;
+    const margin = 0;
+    const photoAreaY = bandH;
+    const photoAreaH = H - bandH * 2 - 110;
+    const gap = 6;
+    const photoW = (W - gap) / 2;
+
+    ctx.save();
+    roundRectPath(ctx, 0, 0, W, H, 10);
+    ctx.fillStyle = '#EFE7D8';
+    ctx.fill();
+    ctx.restore();
+
+    [photoA, photoB].forEach((photo, i) => {
+      const x = i * (photoW + gap);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, photoAreaY, photoW, photoAreaH);
+      ctx.clip();
+      ctx.filter = 'grayscale(0.35) contrast(1.05)';
+      const side = Math.min(photo.width, photo.height);
+      const sx = (photo.width - side) / 2, sy = (photo.height - side) / 2;
+      const scale = Math.max(photoW / side, photoAreaH / side);
+      const dw = side * scale, dh = side * scale;
+      ctx.drawImage(photo, sx, sy, side, side, x + (photoW - dw) / 2, photoAreaY + (photoAreaH - dh) / 2, dw, dh);
+      ctx.filter = 'none';
+      ctx.restore();
+    });
+
+    // center seam
+    ctx.save();
+    ctx.strokeStyle = 'rgba(23,19,16,0.5)';
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    const seamY = margin + frameSize + gap / 2;
-    ctx.moveTo(margin + 10, seamY);
-    ctx.lineTo(margin + frameSize - 10, seamY);
+    ctx.moveTo(photoW + gap / 2, photoAreaY);
+    ctx.lineTo(photoW + gap / 2, photoAreaY + photoAreaH);
     ctx.stroke();
     ctx.restore();
 
-    const capY = margin + frameSize * 2 + gap + capGap;
-    drawCaptionBar(ctx, margin, capY, frameSize, capBarH, accentHex);
+    drawSprocketBand(ctx, 0, 0, W, bandH);
+    drawSprocketBand(ctx, 0, photoAreaY + photoAreaH, W, bandH);
+
+    // small stamped circle bullet + caption in a mono/stamp style, echoing
+    // the "TEXT" motif, with the date stacked below so long captions fit
+    const capY = photoAreaY + photoAreaH + bandH + 32;
+    const captionText = (state.caption && state.caption.trim()) ? state.caption.trim() : 'us, together';
+    ctx.save();
+    ctx.strokeStyle = accentHex;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.ellipse(40, capY, 16, 16, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = accentHex;
+    ctx.font = "700 14px 'Poppins', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('♡', 40, capY + 1);
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = '#1A1310';
+    ctx.font = "700 20px 'Poppins', sans-serif";
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(captionText, 66, capY + 1, W - 92);
+    ctx.restore();
+
+    if (state.showDate) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(26,19,16,0.55)';
+      ctx.font = "600 13px 'Nunito Sans', sans-serif";
+      ctx.textAlign = 'left';
+      const dateStr = new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+      ctx.fillText(dateStr, 66, capY + 26);
+      ctx.restore();
+    }
   }
+
+  /* ---------- 3. SCRAPBOOK POP ----------
+     Two slightly-tilted white-bordered polaroid snapshots overlapping on a
+     soft tinted card, with a star sticker and a scalloped-edge caption
+     patch — the cute mixed-media collage look. */
+  function drawTiltedPolaroid(ctx, cx, cy, size, rotDeg, photo, borderW) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((rotDeg * Math.PI) / 180);
+    ctx.shadowColor = 'rgba(26,19,16,0.28)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 6;
+    ctx.fillStyle = '#FFFFFF';
+    const total = size + borderW * 2;
+    roundRectPath(ctx, -total / 2, -total / 2 - borderW * 0.6, total, total + borderW * 1.2, 6);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.beginPath();
+    ctx.rect(-size / 2, -size / 2 - borderW * 0.6, size, size);
+    ctx.clip();
+    const side = Math.min(photo.width, photo.height);
+    const sx = (photo.width - side) / 2, sy = (photo.height - side) / 2;
+    ctx.drawImage(photo, sx, sy, side, side, -size / 2, -size / 2 - borderW * 0.6, size, size);
+    ctx.restore();
+  }
+
+  function renderScrapbookPop(ctx, W, H, photoA, photoB, accentHex) {
+    roundRectPath(ctx, 0, 0, W, H, 26);
+    ctx.fillStyle = '#FBF3DE';
+    ctx.fill();
+
+    // faint gingham-style grid, echoing the blue-check moodboard backdrop
+    ctx.save();
+    ctx.strokeStyle = 'rgba(26,19,16,0.05)';
+    ctx.lineWidth = 1;
+    for (let gx = 0; gx <= W; gx += 26) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+    for (let gy = 0; gy <= H; gy += 26) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+    ctx.restore();
+
+    const size = W * 0.62;
+    drawTiltedPolaroid(ctx, W * 0.40, H * 0.36, size, -6, photoA, 14);
+    drawTiltedPolaroid(ctx, W * 0.62, H * 0.58, size, 5, photoB, 14);
+
+    drawStar(ctx, W * 0.86, H * 0.16, 15, accentHex, -10);
+    drawStar(ctx, W * 0.13, H * 0.82, 11, accentHex, 18);
+    ctx.save();
+    ctx.fillStyle = accentHex;
+    ctx.font = "700 26px 'Poppins', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.fillText('♡', W * 0.14, H * 0.14);
+    ctx.restore();
+
+    // scalloped caption patch near the bottom
+    const patchY = H - 96, patchH = 76, patchW = W - 76;
+    const patchX = (W - patchW) / 2;
+    ctx.save();
+    ctx.shadowColor = 'rgba(26,19,16,0.18)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 4;
+    ctx.beginPath();
+    const scallopR = 9;
+    const n = Math.round(patchW / (scallopR * 2));
+    const step = patchW / n;
+    ctx.moveTo(patchX, patchY);
+    for (let i = 0; i < n; i++) ctx.arc(patchX + step * (i + 0.5), patchY, scallopR, Math.PI, 0, false);
+    ctx.lineTo(patchX + patchW, patchY + patchH);
+    for (let i = n; i > 0; i--) ctx.arc(patchX + step * (i - 0.5), patchY + patchH, scallopR, 0, Math.PI, false);
+    ctx.lineTo(patchX, patchY);
+    ctx.closePath();
+    ctx.fillStyle = '#FFFBF2';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = '#1A1310';
+    ctx.font = "400 32px 'Beau Rivage', cursive";
+    ctx.textAlign = 'center';
+    const captionText = (state.caption && state.caption.trim()) ? state.caption.trim() : 'us, together';
+    ctx.fillText(captionText, W / 2, patchY + patchH * 0.52);
+    ctx.restore();
+    if (state.showDate) {
+      ctx.save();
+      ctx.fillStyle = accentHex;
+      ctx.font = "700 13px 'Nunito Sans', sans-serif";
+      ctx.textAlign = 'center';
+      const dateStr = new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+      ctx.fillText(dateStr, W / 2, patchY + patchH * 0.82);
+      ctx.restore();
+    }
+  }
+
+  /* ---------- 4. HEART CUTOUT ----------
+     The merged photo cropped into a heart shape with a dotted "stitched"
+     outline and a little bow above it — cute rather than merely modern. */
+  function renderHeartCutout(ctx, W, H, photoA, photoB, accentHex) {
+    const margin = 22;
+    const boxSize = W - margin * 2;
+    const capGap = 18;
+    const capBarH = 84;
+
+    roundRectPath(ctx, 0, 0, W, H, 26);
+    ctx.fillStyle = '#FFFBF2';
+    ctx.fill();
+
+    const combined = document.createElement('canvas');
+    combined.width = boxSize; combined.height = boxSize;
+    const cctx = combined.getContext('2d');
+    if (state.split === 'top') {
+      cctx.drawImage(photoA, 0, 0, photoA.width, photoA.height / 2, 0, 0, boxSize, boxSize / 2);
+      cctx.drawImage(photoB, 0, photoB.height / 2, photoB.width, photoB.height / 2, 0, boxSize / 2, boxSize, boxSize / 2);
+    } else {
+      cctx.drawImage(photoA, 0, 0, photoA.width / 2, photoA.height, 0, 0, boxSize / 2, boxSize);
+      cctx.drawImage(photoB, photoB.width / 2, 0, photoB.width / 2, photoB.height, boxSize / 2, 0, boxSize / 2, boxSize);
+    }
+
+    ctx.save();
+    heartPath(ctx, margin, margin, boxSize, boxSize);
+    ctx.clip();
+    ctx.drawImage(combined, margin, margin, boxSize, boxSize);
+    ctx.restore();
+
+    ctx.save();
+    heartPath(ctx, margin, margin, boxSize, boxSize);
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    heartPath(ctx, margin, margin, boxSize, boxSize);
+    ctx.strokeStyle = accentHex;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([2, 8]);
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.restore();
+
+    drawCaptionBar(ctx, margin, margin + boxSize + capGap, boxSize, capBarH, accentHex);
+  }
+
+  const FRAME_RENDERERS = {
+    washi: { render: renderWashiStrip, height: (W) => Math.round(W * 1.62) },
+    filmstrip: { render: renderFilmstrip, height: (W) => Math.round(W * 0.72) },
+    scrapbook: { render: renderScrapbookPop, height: (W) => Math.round(W * 1.18) },
+    heart: { render: renderHeartCutout, height: (W) => Math.round(W * 1.18) }
+  };
 
   function renderResult(photoA, photoB) {
     state.lastPhotoA = photoA;
@@ -587,26 +791,14 @@
     const canvas = $('final-canvas');
     const accentHex = ACCENTS[state.accent] || ACCENTS.pink;
 
-    // Each frame shape gets its own canvas size — the duo strip is
-    // naturally taller since it stacks two full square frames.
-    let W, H;
-    if (state.shape === 'duo') {
-      W = 620; H = 26 + (620 - 52) * 2 + 16 + 14 + 66 + 26;
-    } else {
-      W = 620; H = 700;
-    }
+    const config = FRAME_RENDERERS[state.shape] || FRAME_RENDERERS.washi;
+    const W = 620;
+    const H = config.height(W);
 
     const p = document.createElement('canvas');
     p.width = W; p.height = H;
     const ctx = p.getContext('2d');
-
-    if (state.shape === 'duo') {
-      renderStudioDuo(ctx, W, H, photoA, photoB, accentHex);
-    } else if (state.shape === 'bloom') {
-      renderBloomCutout(ctx, W, H, photoA, photoB, accentHex);
-    } else {
-      renderClassicModern(ctx, W, H, photoA, photoB, accentHex);
-    }
+    config.render(ctx, W, H, photoA, photoB, accentHex);
 
     // soft shadow + tiny rotation, exported with transparent padding
     const pad = 50;
@@ -636,7 +828,7 @@
   $('download-btn').addEventListener('click', () => {
     const canvas = $('final-canvas');
     const link = document.createElement('a');
-    link.download = 'together-polaroid.png';
+    link.download = 'polaroid-love.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
   });
