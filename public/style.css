@@ -1,0 +1,273 @@
+/* ============================================================
+   Together Booth — design tokens
+   Palette sampled from the reference mood board (Modern.jpg):
+   hot pink hero, warm cream surfaces, sky blue + leaf green accents,
+   near-black ink text, blush pink tint for soft surfaces.
+   Deeper button variants exist so white text always clears
+   WCAG AA for the size it's used at (see accessibility notes below).
+   ============================================================ */
+:root{
+  --pink:        #E7657F;   /* hero / decorative surfaces, large headline text on it may be white */
+  --pink-button: #B23A5A;   /* solid buttons + small text on pink — 5.8:1 with white */
+  --sky:         #4EACC7;   /* light accent, thin rings, chips (pair with ink text) */
+  --sky-deep:    #2E93AD;   /* banners / buttons needing white text — 3.6:1 */
+  --leaf:        #7EBD57;   /* light accent, thin rings, chips (pair with ink text) */
+  --leaf-deep:   #3F8A2E;   /* banners / buttons needing white text — 4.3:1 */
+  --blush:       #F3C4CE;   /* soft tinted surfaces */
+  --cream:       #FBF3DE;   /* app background */
+  --cream-soft:  #FFFBF2;   /* card surfaces */
+  --ink:         #1A1310;   /* body + heading text — 16.6:1 on cream */
+  --ink-soft:    rgba(26,19,16,0.62);
+  --line:        rgba(26,19,16,0.10);
+
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --shadow-card: 0 14px 34px rgba(122,31,61,0.14);
+  --shadow-soft: 0 6px 16px rgba(122,31,61,0.10);
+
+  --font-script: 'Beau Rivage', cursive;
+  --font-display: 'Poppins', sans-serif;
+  --font-body: 'Nunito Sans', sans-serif;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--cream);
+  font-family:var(--font-body);
+  color:var(--ink);
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+}
+.app{width:100%;max-width:520px;min-height:100vh;position:relative;padding-bottom:36px;}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
+
+/* ---------------- Top bar ---------------- */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 22px 10px;
+}
+.brand{
+  font-family:var(--font-display);font-weight:700;font-size:1.15rem;
+  display:flex;align-items:center;gap:8px;color:var(--ink);
+}
+.brand-mark{color:var(--pink-button);display:inline-flex;}
+.brand .script{font-family:var(--font-script);font-weight:400;font-size:1.5em;color:var(--pink-button);}
+.topbar-status{
+  display:flex;align-items:center;gap:7px;font-size:0.82rem;font-weight:600;
+  background:var(--cream-soft);border-radius:100px;padding:6px 12px;box-shadow:var(--shadow-soft);
+}
+.topbar-status .dot{width:8px;height:8px;border-radius:50%;background:#C94B4B;}
+.topbar-status.connected .dot{background:var(--leaf-deep);}
+.topbar-status.connecting .dot{background:var(--sky-deep);animation:pulse 1.2s ease-in-out infinite;}
+
+/* ---------------- Screens ---------------- */
+.screen{display:none;padding:0 22px;animation:fadeIn .3s ease;}
+.screen.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+/* ---------------- Hero (home screen) ---------------- */
+.hero{
+  position:relative;
+  background:var(--pink);
+  border-radius:var(--radius-lg);
+  padding:38px 26px 46px;
+  margin-top:6px;
+  overflow:hidden;
+  color:#fff;
+}
+.hero-blob{
+  position:absolute;right:-40px;top:-50px;width:180px;height:180px;
+  background:rgba(255,255,255,0.14);
+  border-radius:63% 37% 54% 46% / 55% 48% 52% 45%;
+}
+.hero h1{
+  font-family:var(--font-display);font-weight:700;font-size:1.9rem;line-height:1.22;
+  margin:0 0 14px;position:relative;
+}
+.hero h1 .script{font-family:var(--font-script);font-weight:400;font-size:1.35em;line-height:1;color:#FFF3E0;}
+.hero .lede{
+  position:relative;font-size:0.95rem;line-height:1.55;color:rgba(255,255,255,0.92);margin:0;max-width:38ch;
+}
+
+/* Scalloped divider — the signature shape motif, echoing the mood board's
+   pink card meeting the cream section below in soft cloud bumps. */
+.scallop{
+  height:22px;margin-top:-1px;
+  background:
+    radial-gradient(circle at 14px 0, transparent 14px, var(--cream) 15px) 0 -14px / 28px 28px repeat-x;
+}
+
+/* ---------------- Panel + choice cards ---------------- */
+.panel{padding-top:6px;}
+.panel h2, .screen-title{
+  font-family:var(--font-display);font-weight:700;font-size:1.3rem;margin:6px 0 4px;
+}
+.screen-sub{color:var(--ink-soft);font-size:0.9rem;margin:0 0 18px;}
+.script{font-family:var(--font-script);color:var(--pink-button);}
+
+.choice-row{display:flex;gap:12px;margin:14px 0 18px;}
+.choice-card{
+  flex:1;text-align:left;background:var(--cream-soft);border:2px solid transparent;
+  border-radius:var(--radius-md);padding:16px 14px;cursor:pointer;
+  box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:6px;
+  font-family:var(--font-body);transition:border-color .15s ease, transform .15s ease;
+}
+.choice-card:hover{transform:translateY(-2px);}
+.choice-card.selected{border-color:var(--pink-button);}
+.choice-icon{font-size:1.3rem;color:var(--pink-button);}
+.choice-title{font-weight:800;font-size:1rem;color:var(--ink);}
+.choice-sub{font-size:0.78rem;color:var(--ink-soft);line-height:1.4;}
+
+.field-row{margin:0 0 16px;}
+.field-row label{display:block;font-size:0.82rem;font-weight:700;margin-bottom:6px;color:var(--ink-soft);}
+.field-row input, .caption-editor input[type="text"]{
+  width:100%;padding:13px 16px;border-radius:100px;border:2px solid var(--line);
+  font-family:var(--font-body);font-size:1rem;font-weight:600;color:var(--ink);
+  background:var(--cream-soft);letter-spacing:0.03em;
+}
+.field-row input:focus, .caption-editor input[type="text"]:focus{outline:none;border-color:var(--pink-button);}
+
+/* ---------------- Buttons ---------------- */
+.btn-primary{
+  width:100%;margin-top:6px;background:var(--pink-button);color:#fff;border:none;
+  border-radius:100px;padding:15px 18px;font-family:var(--font-display);font-weight:700;font-size:1rem;
+  cursor:pointer;box-shadow:0 10px 22px rgba(178,58,90,0.35);transition:transform .12s ease;
+}
+.btn-primary:hover{transform:translateY(-2px);}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+.btn-text{
+  display:block;width:100%;text-align:center;background:none;border:none;margin-top:14px;
+  color:var(--ink-soft);font-family:var(--font-body);font-weight:700;font-size:0.86rem;
+  text-decoration:underline;cursor:pointer;padding:8px;
+}
+.btn-chip{
+  background:var(--cream-soft);border:2px solid var(--line);border-radius:100px;
+  padding:9px 16px;font-family:var(--font-body);font-weight:700;font-size:0.82rem;
+  color:var(--ink);cursor:pointer;
+}
+.privacy-note{text-align:center;font-size:0.74rem;color:var(--ink-soft);margin-top:16px;line-height:1.5;}
+
+/* ---------------- Design screen ---------------- */
+.group-label{font-family:var(--font-display);font-weight:700;font-size:0.9rem;margin:20px 0 10px;color:var(--ink);}
+
+.shape-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.shape-card{
+  background:var(--cream-soft);border:2px solid transparent;border-radius:var(--radius-md);
+  padding:10px 6px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;
+  font-size:0.72rem;font-weight:700;color:var(--ink);cursor:pointer;box-shadow:var(--shadow-soft);
+}
+.shape-card.selected{border-color:var(--pink-button);}
+.shape-preview{width:56px;height:56px;display:flex;align-items:center;justify-content:center;gap:4px;}
+.shape-preview--classic span{
+  width:44px;height:44px;border-radius:10px;background:var(--blush);border:3px solid var(--pink-button);
+}
+.shape-preview--duo span{
+  width:20px;height:44px;border-radius:8px;background:var(--blush);border:3px solid var(--pink-button);
+}
+.shape-preview--bloom span{
+  width:46px;height:46px;background:var(--blush);border:3px solid var(--pink-button);
+  border-radius:63% 37% 54% 46% / 55% 48% 52% 45%;
+}
+
+.color-row{display:flex;gap:14px;}
+.color-swatch{
+  width:40px;height:40px;border-radius:50%;background:var(--sw);border:3px solid transparent;
+  cursor:pointer;box-shadow:var(--shadow-soft);position:relative;
+}
+.color-swatch.selected{border-color:var(--ink);}
+.color-swatch.selected::after{
+  content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:1rem;font-weight:800;
+}
+
+.split-options{display:flex;gap:12px;}
+.split-opt{
+  flex:1;background:var(--cream-soft);border:2px solid transparent;border-radius:var(--radius-md);
+  padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;
+  cursor:pointer;font-size:0.82rem;font-weight:700;color:var(--ink);box-shadow:var(--shadow-soft);
+}
+.split-opt.selected{border-color:var(--pink-button);}
+.split-icon{width:44px;height:32px;background:var(--blush);border-radius:6px;display:flex;overflow:hidden;}
+.split-icon.side i{flex:1;font-style:normal;}
+.split-icon.side i:first-child{background:var(--pink-button);}
+.split-icon.side i:last-child{background:var(--sky-deep);}
+.split-icon.top{flex-direction:column;}
+.split-icon.top i{flex:1;font-style:normal;}
+.split-icon.top i:first-child{background:var(--pink-button);}
+.split-icon.top i:last-child{background:var(--sky-deep);}
+
+/* ---------------- Lobby ---------------- */
+.code-card, .join-status{
+  background:var(--pink);color:#fff;border-radius:var(--radius-md);padding:20px;text-align:center;
+  margin:10px 0 18px;box-shadow:var(--shadow-card);
+}
+.code-label{display:block;font-size:0.82rem;opacity:0.9;font-weight:600;margin-bottom:8px;}
+.code-value{
+  display:block;font-family:var(--font-display);font-weight:800;font-size:2rem;letter-spacing:0.06em;
+  margin-bottom:14px;
+}
+.code-actions{display:flex;gap:10px;justify-content:center;}
+
+.lobby-video-row{display:flex;gap:10px;margin-bottom:14px;}
+.lobby-video-box{
+  position:relative;flex:1;aspect-ratio:3/4;background:#1A1310;border-radius:var(--radius-md);
+  overflow:hidden;box-shadow:var(--shadow-soft);
+}
+.lobby-video-box video{width:100%;height:100%;object-fit:cover;}
+#local-video, #local-video-2{transform:scaleX(-1);} /* mirror only the live self-preview, never the final photo */
+.lobby-video-tag{
+  position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,0.5);color:#fff;
+  font-size:0.72rem;font-weight:700;padding:4px 10px;border-radius:100px;
+}
+.lobby-waiting{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;
+  background:rgba(26,19,16,0.55);color:#fff;font-size:0.78rem;font-weight:600;text-align:center;padding:0 10px;
+}
+.pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--sky-deep);animation:pulse 1.2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(0.7);}}
+
+.camera-error{
+  display:none;background:var(--blush);color:#6B1A32;border-radius:var(--radius-sm);
+  padding:12px 14px;font-size:0.82rem;margin-bottom:14px;line-height:1.5;
+}
+.camera-error.show{display:block;}
+
+.ready-row{text-align:center;}
+.ready-hint{font-size:0.82rem;color:var(--ink-soft);margin-top:10px;}
+
+/* ---------------- Capture screen ---------------- */
+.capture-stage{
+  position:relative;border-radius:var(--radius-lg);overflow:hidden;background:#000;
+  aspect-ratio:3/4;margin-top:10px;box-shadow:var(--shadow-card);
+  display:flex;
+}
+.capture-stage video{flex:1;width:50%;height:100%;object-fit:cover;}
+.countdown-overlay{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-weight:800;font-size:5rem;color:#fff;
+  text-shadow:0 4px 14px rgba(0,0,0,0.5);opacity:0;pointer-events:none;
+}
+.countdown-overlay.show{animation:pop .75s ease;}
+@keyframes pop{
+  0%{opacity:0;transform:scale(0.5);}30%{opacity:1;transform:scale(1.15);}
+  60%{opacity:1;transform:scale(1);}100%{opacity:0;transform:scale(0.92);}
+}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;}
+.flash.go{animation:flashPop .35s ease;}
+@keyframes flashPop{0%{opacity:0.95;}100%{opacity:0;}}
+
+/* ---------------- Result ---------------- */
+.result-canvas-wrap{display:flex;justify-content:center;margin-top:6px;}
+#final-canvas{max-width:100%;height:auto;}
+.caption-editor{margin-top:18px;}
+.date-toggle{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:12px;font-size:0.86rem;font-weight:600;}
+
+.app-footer{text-align:center;font-size:0.75rem;color:var(--ink-soft);margin-top:30px;}
+
+@media (max-width:380px){
+  .hero h1{font-size:1.6rem;}
+  .code-value{font-size:1.6rem;}
+}

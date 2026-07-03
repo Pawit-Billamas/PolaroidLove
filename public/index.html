@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Together Booth — take a polaroid with someone, anywhere</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Beau+Rivage&family=Poppins:wght@500;600;700;800&family=Nunito+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- ============ TOP BAR ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="22" height="22"><circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="16" cy="16" r="5" fill="currentColor"/></svg>
+      </span>
+      Together <span class="script">Booth</span>
+    </div>
+    <div class="topbar-status" id="topbar-status" hidden>
+      <span class="dot" id="conn-dot"></span>
+      <span id="conn-label">Not connected</span>
+    </div>
+  </header>
+
+  <main id="stage">
+
+    <!-- ============ SCREEN: HOME ============ -->
+    <section class="screen active" id="screen-home">
+      <div class="hero">
+        <div class="hero-blob" aria-hidden="true"></div>
+        <h1>A <span class="script">polaroid</span> for two,<br>on two phones.</h1>
+        <p class="lede">Open this on your device, share a code with them on theirs, and the shutter fires for both of you at once — over a real live video connection, no app install.</p>
+      </div>
+
+      <div class="scallop" aria-hidden="true"></div>
+
+      <div class="panel">
+        <h2>Start a session</h2>
+        <div class="choice-row">
+          <button class="choice-card selected" id="mode-host" data-mode="host">
+            <span class="choice-icon">✦</span>
+            <span class="choice-title">Create a room</span>
+            <span class="choice-sub">You pick the frame, they join with your code</span>
+          </button>
+          <button class="choice-card" id="mode-guest" data-mode="guest">
+            <span class="choice-icon">✎</span>
+            <span class="choice-title">Join a room</span>
+            <span class="choice-sub">Got a code from your person? Enter it here</span>
+          </button>
+        </div>
+
+        <div id="guest-code-row" class="field-row" hidden>
+          <label for="join-code-input">Room code</label>
+          <input type="text" id="join-code-input" placeholder="e.g. PINK-42" maxlength="12" autocomplete="off" autocapitalize="characters">
+        </div>
+
+        <button class="btn-primary" id="continue-btn">Continue</button>
+        <p class="privacy-note">Video only ever travels directly between your two devices (peer-to-peer). Nothing is uploaded or stored on a server.</p>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN: DESIGN (host only) ============ -->
+    <section class="screen" id="screen-design">
+      <h2 class="screen-title">Pick a look <span class="script">for us</span></h2>
+      <p class="screen-sub">You're choosing for both of you — your partner will see the same frame.</p>
+
+      <h3 class="group-label">Frame shape</h3>
+      <div class="shape-grid" id="shape-grid">
+        <button class="shape-card selected" data-shape="classic">
+          <span class="shape-preview shape-preview--classic"><span></span></span>
+          Classic Modern
+        </button>
+        <button class="shape-card" data-shape="duo">
+          <span class="shape-preview shape-preview--duo"><span></span><span></span></span>
+          Studio Duo
+        </button>
+        <button class="shape-card" data-shape="bloom">
+          <span class="shape-preview shape-preview--bloom"><span></span></span>
+          Bloom Cutout
+        </button>
+      </div>
+
+      <h3 class="group-label">Accent color</h3>
+      <div class="color-row" id="color-row">
+        <button class="color-swatch selected" data-color="pink" style="--sw:#E7657F;"><span class="sr-only">Pink</span></button>
+        <button class="color-swatch" data-color="sky" style="--sw:#2E93AD;"><span class="sr-only">Sky</span></button>
+        <button class="color-swatch" data-color="leaf" style="--sw:#3F8A2E;"><span class="sr-only">Leaf</span></button>
+      </div>
+
+      <div id="split-row">
+        <h3 class="group-label">Split direction</h3>
+        <div class="split-options">
+          <button class="split-opt selected" data-split="side">
+            <span class="split-icon side"><i></i><i></i></span>
+            Side by side
+          </button>
+          <button class="split-opt" data-split="top">
+            <span class="split-icon top"><i></i><i></i></span>
+            Top &amp; bottom
+          </button>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="design-continue-btn">Create my room</button>
+      <button class="btn-text" id="design-back-btn">← Back</button>
+    </section>
+
+    <!-- ============ SCREEN: LOBBY (waiting to connect) ============ -->
+    <section class="screen" id="screen-lobby">
+      <h2 class="screen-title" id="lobby-title">Your room code</h2>
+
+      <div class="code-card" id="host-code-card">
+        <span class="code-label">Share this with them</span>
+        <span class="code-value" id="room-code-display">—</span>
+        <div class="code-actions">
+          <button class="btn-chip" id="copy-code-btn">Copy code</button>
+          <button class="btn-chip" id="copy-link-btn">Copy join link</button>
+        </div>
+      </div>
+
+      <div class="join-status" id="join-status-card" hidden>
+        <span class="code-label">Joining room</span>
+        <span class="code-value" id="joining-code-display">—</span>
+      </div>
+
+      <div class="lobby-video-row">
+        <div class="lobby-video-box">
+          <video id="local-video" autoplay playsinline muted></video>
+          <span class="lobby-video-tag">You</span>
+        </div>
+        <div class="lobby-video-box" id="remote-video-box">
+          <video id="remote-video" autoplay playsinline></video>
+          <span class="lobby-video-tag" id="remote-video-tag">Waiting…</span>
+          <div class="lobby-waiting" id="lobby-waiting">
+            <span class="pulse-dot"></span> waiting for them to join
+          </div>
+        </div>
+      </div>
+
+      <div class="camera-error" id="camera-error">
+        Couldn't access your camera. Please allow camera access in your browser, then reload this page.
+      </div>
+
+      <div class="ready-row" id="ready-row" hidden>
+        <button class="btn-primary" id="ready-btn">I'm ready 📸</button>
+        <p class="ready-hint" id="ready-hint">Waiting for both of you to be ready…</p>
+      </div>
+
+      <button class="btn-text" id="lobby-leave-btn">← Leave room</button>
+    </section>
+
+    <!-- ============ SCREEN: CAPTURE (countdown + shutter) ============ -->
+    <section class="screen" id="screen-capture">
+      <div class="capture-stage">
+        <video id="local-video-2" autoplay playsinline muted></video>
+        <video id="remote-video-2" autoplay playsinline></video>
+        <div class="countdown-overlay" id="countdown-overlay"></div>
+        <div class="flash" id="flash"></div>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN: RESULT ============ -->
+    <section class="screen" id="screen-result">
+      <h2 class="screen-title">Yours to keep <span class="script">forever</span></h2>
+      <div class="result-canvas-wrap"><canvas id="final-canvas"></canvas></div>
+
+      <div class="caption-editor">
+        <input type="text" id="caption-input" maxlength="40" placeholder="Add a caption, e.g. us ♡">
+        <label class="date-toggle"><input type="checkbox" id="date-toggle" checked> Show today's date</label>
+      </div>
+
+      <button class="btn-primary" id="download-btn">Download my copy</button>
+      <button class="btn-text" id="new-session-btn">Start a new session</button>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">made for two, wherever you both are 💌</footer>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
