@@ -92,6 +92,10 @@ body{
 .hero .lede{
   position:relative;font-size:0.95rem;line-height:1.55;color:rgba(255,255,255,0.92);margin:0;max-width:38ch;
 }
+.hero-note{
+  position:relative;margin:16px 0 0;font-family:'Noto Sans Thai',var(--font-body);
+  font-weight:600;font-size:1.05rem;color:#FFF3E0;
+}
 
 /* Scalloped divider — the signature shape motif, echoing the mood board's
    pink card meeting the cream section below in soft cloud bumps. */
