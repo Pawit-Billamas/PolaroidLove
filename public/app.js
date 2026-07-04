@@ -61,6 +61,17 @@
 
   const isSolo = () => state.mode === 'solo';
 
+  // How many capture rounds (each = one 3-2-1 shutter) a session needs to
+  // fill the chosen grid. Solo fills every cell with one of your own shots,
+  // so it needs `count` rounds. Together-mode fills two cells per round
+  // (one of you + one of your partner, captured on the same shutter), so it
+  // needs ceil(count / 2). This is the single source of truth used by the
+  // capture loop, the progress label, and finalizeShots.
+  function roundsNeeded() {
+    const count = GRID_LAYOUTS[state.grid].count;
+    return isSolo() ? count : Math.ceil(count / 2);
+  }
+
   const ACCENTS = {
     pink: '#B23A5A',
     sky: '#2E93AD',
@@ -495,17 +506,17 @@
     const captureDelay = ticks.length * plan.countdownMs;
     setTimeout(() => {
       if (myToken !== shotRunToken) return;
-      captureOneShot(state.shotIndex, GRID_LAYOUTS[state.grid].count);
+      captureOneShot(state.shotIndex);
       state.shotIndex++;
       state.myReady = false;
       state.peerReady = false;
       countdownRunning = false;
 
-      const total = GRID_LAYOUTS[state.grid].count;
+      const rounds = roundsNeeded();
       setTimeout(() => {
         if (myToken !== shotRunToken) return;
-        if (state.shotIndex >= total) {
-          finalizeShots(total);
+        if (state.shotIndex >= rounds) {
+          finalizeShots();
         } else {
           // More shots left in this grid — reset for the next ready beat
           // instead of auto-advancing.
@@ -520,12 +531,12 @@
   }
 
   function updateShotProgress() {
-    const total = GRID_LAYOUTS[state.grid].count;
-    const current = Math.min(state.shotIndex + 1, total);
+    const rounds = roundsNeeded();
+    const current = Math.min(state.shotIndex + 1, rounds);
     const el = $('shot-progress');
-    if (total > 1) {
+    if (rounds > 1) {
       el.hidden = false;
-      el.textContent = `Photo ${current} of ${total}`;
+      el.textContent = `Photo ${current} of ${rounds}`;
     } else {
       el.hidden = true;
     }
@@ -557,7 +568,7 @@
     return c;
   }
 
-  function captureOneShot(index, total) {
+  function captureOneShot(index) {
     if (index === 0) $('countdown-overlay').classList.remove('show');
     const flash = $('flash');
     flash.classList.remove('go');
@@ -576,28 +587,43 @@
     }
   }
 
-  function finalizeShots(total) {
-    const gridDef = GRID_LAYOUTS[state.grid];
+  function finalizeShots() {
+    const count = GRID_LAYOUTS[state.grid].count;
+    const rounds = roundsNeeded();
     let ordered;
 
     if (isSolo()) {
-      ordered = state.myShots.slice(0, total);
+      // One own shot per cell.
+      ordered = state.myShots.slice(0, count);
     } else {
-      // Host is always first-in-pair, guest second — generalized from the
-      // old fixed 2-slot convention so both people appear equally often
-      // and in temporal order across N shots.
+      // Each round captured one of me + one of my partner on the same
+      // shutter. Interleave them into consecutive cells so both people
+      // appear equally often and in temporal order:
+      //   [me-1, them-1, me-2, them-2, ...]
+      // Host is always first-in-pair, guest second, so both devices produce
+      // an identical ordering. Trimmed to the grid's cell count (an odd
+      // count like 3 keeps the first cell of the final round and drops the
+      // partner's extra).
       ordered = [];
-      for (let i = 0; i < total; i++) {
+      for (let i = 0; i < rounds; i++) {
         const mine = state.myShots[i];
         const theirs = state.peerShots[i];
         const pair = state.role === 'host' ? [mine, theirs] : [theirs, mine];
         ordered.push(pair[0], pair[1]);
       }
-      ordered = ordered.slice(0, gridDef.count);
+      ordered = ordered.slice(0, count);
     }
 
     $('ready-row-capture').hidden = true;
     $('shot-progress').hidden = true;
+    if (window.__DEBUG) {
+      window.__finalizeInfo = {
+        role: state.role, count, rounds,
+        myShots: state.myShots.length, peerShots: state.peerShots.length,
+        orderedLen: ordered.length,
+        distinct: new Set(ordered).size
+      };
+    }
     renderResult(ordered);
     setTimeout(() => goToScreen('result'), 550);
   }
