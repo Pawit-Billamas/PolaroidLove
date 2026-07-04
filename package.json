@@ -5,7 +5,8 @@
   "description": "Take a synced polaroid with someone on another device, live over a room code.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node test/run.js"
   },
   "engines": {
     "node": ">=18"
@@ -13,5 +14,8 @@
   "dependencies": {
     "express": "^4.22.2",
     "peer": "^1.0.2"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
   }
 }

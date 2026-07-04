@@ -294,6 +294,10 @@
 
   /* ============ HOST CONNECTION ============ */
   async function startHostConnection(attempt = 0) {
+    // Hard guard: solo mode must never open a room / PeerJS connection,
+    // no matter how this is reached. Belt-and-suspenders against any
+    // future code path accidentally calling this while in solo mode.
+    if (isSolo()) { startSoloSession(); return; }
     setStatus('connecting', 'Waiting for them to join…');
     await openCamera().catch(() => {});
     const iceServers = await getIceServers();
@@ -335,6 +339,7 @@
 
   /* ============ GUEST CONNECTION ============ */
   async function startGuestConnection() {
+    if (isSolo()) { startSoloSession(); return; }
     $('host-code-card').hidden = true;
     $('join-status-card').hidden = false;
     $('joining-code-display').textContent = state.roomCode;
