@@ -108,9 +108,9 @@ body{
 .screen-sub{color:var(--ink-soft);font-size:0.9rem;margin:0 0 18px;}
 .script{font-family:var(--font-script);color:var(--pink-button);}
 
-.choice-row{display:flex;gap:12px;margin:14px 0 18px;}
+.choice-row{display:flex;flex-wrap:wrap;gap:12px;margin:14px 0 18px;}
 .choice-card{
-  flex:1;text-align:left;background:var(--cream-soft);border:2px solid transparent;
+  flex:1 1 150px;text-align:left;background:var(--cream-soft);border:2px solid transparent;
   border-radius:var(--radius-md);padding:16px 14px;cursor:pointer;
   box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:6px;
   font-family:var(--font-body);transition:border-color .15s ease, transform .15s ease;
@@ -153,13 +153,20 @@ body{
 /* ---------------- Design screen ---------------- */
 .group-label{font-family:var(--font-display);font-weight:700;font-size:0.9rem;margin:20px 0 10px;color:var(--ink);}
 
-.shape-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.design-columns{display:block;}
+
+.shape-grid{
+  display:flex;overflow-x:auto;gap:10px;padding-bottom:4px;
+  scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
+}
 .shape-card{
+  flex:0 0 auto;scroll-snap-align:start;width:104px;
   background:var(--cream-soft);border:2px solid transparent;border-radius:var(--radius-md);
   padding:10px 6px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;
   font-size:0.72rem;font-weight:700;color:var(--ink);cursor:pointer;box-shadow:var(--shadow-soft);
 }
 .shape-card.selected{border-color:var(--pink-button);}
+.shape-card.unavailable{opacity:0.35;cursor:not-allowed;}
 .shape-preview{width:56px;height:56px;display:flex;align-items:center;justify-content:center;gap:4px;position:relative;}
 
 /* Washi Strip — two stacked frames with a torn tape accent */
@@ -200,6 +207,33 @@ body{
   width:44px;height:40px;background:var(--blush);border:3px solid var(--pink-button);
   clip-path:path('M22 38C22 38 3 26 3 13C3 5 9 1 15 1C18.5 1 22 4 22 8C22 4 25.5 1 29 1C35 1 41 5 41 13C41 26 22 38 22 38Z');
 }
+
+/* ---------------- Grid layout picker ---------------- */
+.grid-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px;}
+.grid-card{
+  background:var(--cream-soft);border:2px solid transparent;border-radius:var(--radius-md);
+  padding:10px 6px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;
+  font-size:0.68rem;font-weight:700;color:var(--ink);cursor:pointer;box-shadow:var(--shadow-soft);
+  text-align:center;
+}
+.grid-card.selected{border-color:var(--pink-button);}
+.grid-preview{width:44px;height:44px;display:grid;gap:3px;background:var(--blush);border-radius:6px;padding:4px;}
+.grid-preview span{background:var(--pink-button);border-radius:2px;opacity:0.85;}
+.grid-preview--solo1{grid-template-columns:1fr;}
+.grid-preview--strip2{grid-template-rows:1fr 1fr;}
+.grid-preview--side2{grid-template-columns:1fr 1fr;}
+.grid-preview--strip3{grid-template-rows:1fr 1fr 1fr;}
+.grid-preview--strip4{grid-template-rows:repeat(4,1fr);}
+.grid-preview--grid9{grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);}
+
+/* ---------------- Filter picker ---------------- */
+.filter-row{display:flex;flex-wrap:wrap;gap:8px;}
+.filter-pill{
+  background:var(--cream-soft);border:2px solid var(--line);border-radius:100px;
+  padding:9px 16px;font-family:var(--font-body);font-weight:700;font-size:0.82rem;
+  color:var(--ink);cursor:pointer;
+}
+.filter-pill.selected{border-color:var(--pink-button);background:var(--blush);}
 
 .color-row{display:flex;gap:14px;}
 .color-swatch{
@@ -274,6 +308,8 @@ body{
   display:flex;
 }
 .capture-stage video{flex:1;width:50%;height:100%;object-fit:cover;}
+.capture-stage.solo video#remote-video-2{display:none;}
+.capture-stage.solo video#local-video-2{width:100%;}
 .countdown-overlay{
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-family:var(--font-display);font-weight:800;font-size:5rem;color:#fff;
@@ -289,14 +325,56 @@ body{
 @keyframes flashPop{0%{opacity:0.95;}100%{opacity:0;}}
 
 /* ---------------- Result ---------------- */
-.result-canvas-wrap{display:flex;justify-content:center;margin-top:6px;}
+.result-canvas-wrap{position:relative;display:flex;justify-content:center;margin-top:6px;}
 #final-canvas{max-width:100%;height:auto;}
 .caption-editor{margin-top:18px;}
 .date-toggle{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:12px;font-size:0.86rem;font-weight:600;}
+
+/* ---------------- Sticker decoration ---------------- */
+.sticker-layer{position:absolute;inset:0;pointer-events:none;touch-action:none;}
+.sticker-el{
+  position:absolute;font-size:2.2rem;line-height:1;cursor:grab;pointer-events:auto;
+  user-select:none;touch-action:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+}
+.sticker-el:active{cursor:grabbing;}
+.sticker-el.selected{outline:2px dashed var(--pink-button);outline-offset:6px;border-radius:8px;}
+.sticker-toolbar{
+  position:absolute;display:flex;gap:4px;background:var(--ink);border-radius:100px;
+  padding:6px;box-shadow:var(--shadow-card);transform:translateX(-50%);z-index:2;
+}
+.sticker-toolbar button{
+  width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,0.12);
+  color:#fff;font-size:0.95rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+.sticker-toolbar button:hover{background:rgba(255,255,255,0.24);}
+
+.sticker-picker{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px;}
+.sticker-pick{
+  width:44px;height:44px;border-radius:50%;background:var(--cream-soft);border:2px solid var(--line);
+  font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-soft);
+}
+.sticker-pick:hover{border-color:var(--pink-button);}
 
 .app-footer{text-align:center;font-size:0.75rem;color:var(--ink-soft);margin-top:30px;}
 
 @media (max-width:380px){
   .hero h1{font-size:1.6rem;}
   .code-value{font-size:1.6rem;}
+}
+
+/* ==================== RESPONSIVE: tablet / small desktop ==================== */
+@media (min-width:700px){
+  .app{max-width:640px;}
+  .screen{padding:0 40px;}
+  .choice-row{gap:16px;}
+  .design-columns{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;}
+}
+
+/* ==================== RESPONSIVE: desktop ==================== */
+@media (min-width:1024px){
+  .app{max-width:960px;}
+  .lobby-video-row{max-width:820px;margin:0 auto 14px;}
+  .lobby-video-box{aspect-ratio:4/3;}
+  .capture-stage{aspect-ratio:16/9;}
+  .result-canvas-wrap{max-width:520px;margin:0 auto;}
 }

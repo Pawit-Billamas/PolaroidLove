@@ -31,11 +31,14 @@
 
   /* ============ STATE ============ */
   const state = {
+    mode: 'together',        // 'together' | 'solo'
     role: 'host',            // 'host' | 'guest'
     roomCode: null,
     shape: 'washi',          // 'washi' | 'filmstrip' | 'scrapbook' | 'heart'
     accent: 'pink',          // 'pink' | 'sky' | 'leaf'
-    split: 'side',           // 'side' | 'top'  (ignored for 'washi'/'filmstrip')
+    split: 'side',           // 'side' | 'top'  (only meaningful for 'heart')
+    grid: 'strip2',          // key into GRID_LAYOUTS
+    filter: 'none',          // key into FILTER_PRESETS
     peer: null,
     dataConn: null,
     localStream: null,
@@ -44,13 +47,65 @@
     peerReady: false,
     peerConnected: false,
     caption: '',
-    showDate: true
+    showDate: true,
+
+    // multi-shot capture runtime state
+    shotPlan: null,
+    shotIndex: 0,
+    myShots: [],
+    peerShots: [],
+    lastPhotos: null,        // array of N HTMLCanvasElements, slot-ordered
+
+    // sticker decoration (result screen only)
+    stickers: []
   };
+
+  const isSolo = () => state.mode === 'solo';
 
   const ACCENTS = {
     pink: '#B23A5A',
     sky: '#2E93AD',
     leaf: '#3F8A2E'
+  };
+
+  const FILTER_PRESETS = {
+    none:    { label: 'None',    css: 'none' },
+    vintage: { label: 'Vintage', css: 'sepia(0.35) saturate(1.15) contrast(1.05) brightness(1.02)' },
+    bw:      { label: 'B & W',   css: 'grayscale(1) contrast(1.08)' },
+    warm:    { label: 'Warm',    css: 'sepia(0.18) saturate(1.3) hue-rotate(-6deg) brightness(1.03)' },
+    cool:    { label: 'Cool',    css: 'saturate(1.1) hue-rotate(10deg) brightness(1.02) contrast(1.02)' }
+  };
+
+  function build3x3Cells() {
+    const cells = [];
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) cells.push({ x: c / 3, y: r / 3, w: 1 / 3, h: 1 / 3 });
+    }
+    return cells;
+  }
+
+  const GRID_LAYOUTS = {
+    solo1:  { label: '1 photo',  count: 1, aspect: 1,    cells: [{ x: 0, y: 0, w: 1, h: 1 }] },
+    strip2: { label: '2 photos', count: 2, aspect: 0.62, cells: [
+      { x: 0, y: 0,   w: 1, h: 0.5 },
+      { x: 0, y: 0.5, w: 1, h: 0.5 }
+    ]},
+    side2:  { label: '2 photos, side by side', count: 2, aspect: 1.5, cells: [
+      { x: 0,   y: 0, w: 0.5, h: 1 },
+      { x: 0.5, y: 0, w: 0.5, h: 1 }
+    ]},
+    strip3: { label: '3 photos', count: 3, aspect: 0.42, cells: [
+      { x: 0, y: 0,     w: 1, h: 1 / 3 },
+      { x: 0, y: 1 / 3, w: 1, h: 1 / 3 },
+      { x: 0, y: 2 / 3, w: 1, h: 1 / 3 }
+    ]},
+    strip4: { label: '4 photos', count: 4, aspect: 0.32, cells: [
+      { x: 0, y: 0,    w: 1, h: 0.25 },
+      { x: 0, y: 0.25, w: 1, h: 0.25 },
+      { x: 0, y: 0.5,  w: 1, h: 0.25 },
+      { x: 0, y: 0.75, w: 1, h: 0.25 }
+    ]},
+    grid9:  { label: '9 photos', count: 9, aspect: 1, cells: build3x3Cells() }
   };
 
   const ROOM_WORDS = ['TULIP', 'CORAL', 'PETAL', 'CLAY', 'BLOOM', 'LEAF', 'GLAZE', 'KILN', 'VASE', 'PINK', 'SKY', 'ROSE', 'FERN', 'MOSS', 'SAGE'];
@@ -71,10 +126,13 @@
   /* ============ HOME SCREEN ============ */
   $('mode-host').addEventListener('click', () => setMode('host'));
   $('mode-guest').addEventListener('click', () => setMode('guest'));
+  $('mode-solo').addEventListener('click', () => setMode('solo'));
   function setMode(mode) {
-    state.role = mode;
+    state.mode = mode === 'solo' ? 'solo' : 'together';
+    if (mode !== 'solo') state.role = mode;
     $('mode-host').classList.toggle('selected', mode === 'host');
     $('mode-guest').classList.toggle('selected', mode === 'guest');
+    $('mode-solo').classList.toggle('selected', mode === 'solo');
     $('guest-code-row').hidden = mode !== 'guest';
   }
 
@@ -86,7 +144,8 @@
   }
 
   $('continue-btn').addEventListener('click', () => {
-    if (state.role === 'host') {
+    if (isSolo() || state.role === 'host') {
+      $('design-continue-btn').textContent = isSolo() ? 'Start' : 'Create my room';
       goToScreen('design');
     } else {
       const code = $('join-code-input').value.trim().toUpperCase();
@@ -100,15 +159,51 @@
     }
   });
 
-  /* ============ DESIGN SCREEN (host only) ============ */
+  /* ============ DESIGN SCREEN (host/solo only) ============ */
   $('design-back-btn').addEventListener('click', () => goToScreen('home'));
+
+  function refreshShapeAvailability() {
+    document.querySelectorAll('.shape-card').forEach((card) => {
+      const shape = card.dataset.shape;
+      const allow = FRAME_RENDERERS[shape].grids;
+      const ok = allow === 'any' || allow.includes(state.grid);
+      card.classList.toggle('unavailable', !ok);
+      card.disabled = !ok;
+    });
+    if (FRAME_RENDERERS[state.shape].grids !== 'any' &&
+        !FRAME_RENDERERS[state.shape].grids.includes(state.grid)) {
+      state.shape = 'washi';
+      document.querySelectorAll('.shape-card').forEach((c) => c.classList.remove('selected'));
+      document.querySelector('.shape-card[data-shape="washi"]').classList.add('selected');
+      $('split-row').style.display = 'none';
+    }
+  }
+
+  document.querySelectorAll('.grid-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      state.grid = card.dataset.grid;
+      document.querySelectorAll('.grid-card').forEach((c) => c.classList.remove('selected'));
+      card.classList.add('selected');
+      refreshShapeAvailability();
+    });
+  });
 
   document.querySelectorAll('.shape-card').forEach((card) => {
     card.addEventListener('click', () => {
+      if (card.disabled) return;
       state.shape = card.dataset.shape;
       document.querySelectorAll('.shape-card').forEach((c) => c.classList.remove('selected'));
       card.classList.add('selected');
       $('split-row').style.display = state.shape === 'heart' ? '' : 'none';
+    });
+  });
+
+  document.querySelectorAll('.filter-pill').forEach((pill) => {
+    pill.addEventListener('click', () => {
+      state.filter = pill.dataset.filter;
+      document.querySelectorAll('.filter-pill').forEach((p) => p.classList.remove('selected'));
+      pill.classList.add('selected');
+      applyLiveFilterToVideos();
     });
   });
 
@@ -129,12 +224,17 @@
   });
 
   $('design-continue-btn').addEventListener('click', () => {
-    state.roomCode = generateRoomCode();
-    goToScreen('lobby');
-    $('host-code-card').hidden = false;
-    $('join-status-card').hidden = true;
-    $('room-code-display').textContent = state.roomCode;
-    startHostConnection();
+    if (isSolo()) {
+      goToScreen('lobby');
+      startSoloSession();
+    } else {
+      state.roomCode = generateRoomCode();
+      goToScreen('lobby');
+      $('host-code-card').hidden = false;
+      $('join-status-card').hidden = true;
+      $('room-code-display').textContent = state.roomCode;
+      startHostConnection();
+    }
   });
 
   /* ============ ICE CONFIG ============ */
@@ -167,11 +267,19 @@
       $('local-video').srcObject = stream;
       $('local-video-2').srcObject = stream;
       $('camera-error').classList.remove('show');
+      applyLiveFilterToVideos();
       return stream;
     } catch (e) {
       $('camera-error').classList.add('show');
       throw e;
     }
+  }
+
+  function applyLiveFilterToVideos() {
+    const css = FILTER_PRESETS[state.filter].css;
+    ['local-video', 'local-video-2', 'remote-video', 'remote-video-2'].forEach((id) => {
+      $(id).style.filter = css;
+    });
   }
 
   function attachRemoteStream(stream) {
@@ -195,6 +303,8 @@
     $('lobby-waiting').style.display = 'flex';
     $('ready-row').hidden = true;
     setStatus('', 'Partner disconnected');
+    shotRunToken++; // abort any in-flight capture run's scheduled callbacks
+    countdownRunning = false;
     if (screens.capture.classList.contains('active') || screens.result.classList.contains('active')) {
       goToScreen('lobby');
     }
@@ -221,7 +331,7 @@
     peer.on('connection', (conn) => {
       state.dataConn = conn;
       conn.on('open', () => {
-        conn.send({ type: 'config', shape: state.shape, accent: state.accent, split: state.split });
+        conn.send({ type: 'config', shape: state.shape, accent: state.accent, split: state.split, grid: state.grid, filter: state.filter });
       });
       conn.on('data', handleData);
       conn.on('close', handlePartnerLeft);
@@ -274,6 +384,17 @@
     });
   }
 
+  /* ============ SOLO SESSION (no PeerJS, no room code) ============ */
+  async function startSoloSession() {
+    $('host-code-card').hidden = true;
+    $('join-status-card').hidden = true;
+    $('remote-video-box').hidden = true;
+    $('topbar-status').hidden = true;
+    await openCamera().catch(() => {});
+    $('ready-row').hidden = false;
+    $('ready-hint').textContent = "Whenever you're ready…";
+  }
+
   /* ============ DATA CHANNEL MESSAGES ============ */
   function sendData(msg) {
     if (state.dataConn && state.dataConn.open) state.dataConn.send(msg);
@@ -287,28 +408,36 @@
         state.shape = msg.shape;
         state.accent = msg.accent;
         state.split = msg.split;
+        state.grid = msg.grid || state.grid;
+        state.filter = msg.filter || state.filter;
+        applyLiveFilterToVideos();
         break;
       case 'ready':
         state.peerReady = !!msg.value;
         updateReadyHint();
         if (state.role === 'host') maybeStartCountdown();
         break;
-      case 'countdown':
-        runCountdownStep(msg.value, false);
+      case 'shotplan':
+        runShotPlan(msg);
         break;
       default:
         break;
     }
   }
 
-  /* ============ READY / COUNTDOWN SYNC ============ */
+  /* ============ READY / SHOT-PLAN SYNC ============ */
   $('ready-btn').addEventListener('click', () => {
     state.myReady = true;
     $('ready-btn').disabled = true;
-    $('ready-btn').textContent = 'Waiting for them…';
-    sendData({ type: 'ready', value: true });
-    updateReadyHint();
-    if (state.role === 'host') maybeStartCountdown();
+    $('ready-btn').textContent = isSolo() ? 'Starting…' : 'Waiting for them…';
+    if (isSolo()) {
+      const grid = GRID_LAYOUTS[state.grid];
+      runShotPlan({ count: grid.count, intervalMs: 1200, countdownMs: 700, t0: performance.now() });
+    } else {
+      sendData({ type: 'ready', value: true });
+      updateReadyHint();
+      if (state.role === 'host') maybeStartCountdown();
+    }
   });
 
   function updateReadyHint() {
@@ -323,69 +452,121 @@
 
   let countdownRunning = false;
   function maybeStartCountdown() {
-    // Only the host ever drives the countdown, so both sides never race
+    // Only the host ever drives the shot plan, so both sides never race
     // to lead it at the same time.
     if (countdownRunning) return;
     if (!(state.myReady && state.peerReady)) return;
-    countdownRunning = true;
-    const seq = ['3', '2', '1', 'capture'];
-    let i = 0;
-    (function tick() {
-      const value = seq[i];
-      sendData({ type: 'countdown', value });
-      runCountdownStep(value, true);
-      i++;
-      if (i < seq.length) setTimeout(tick, 700);
-    })();
+    const grid = GRID_LAYOUTS[state.grid];
+    const plan = { type: 'shotplan', count: grid.count, intervalMs: 1200, countdownMs: 700, t0: performance.now() };
+    sendData(plan);
+    runShotPlan(plan);
   }
 
-  function runCountdownStep(value, isSelf) {
+  // Shared entry point for BOTH together-mode (networked, one 'shotplan'
+  // message drives both sides) and solo-mode (built locally, no network).
+  // Each side anchors timing to ITS OWN clock read here rather than trying
+  // to translate the sender's t0 onto its own clock — the guest's shots
+  // land roughly one network-hop-latency later than the host's, which is
+  // imperceptible for a couples photo and avoids NTP-style offset
+  // correlation entirely.
+  // Bumped every time a run is aborted (partner disconnect) so any already-
+  // scheduled setTimeout callbacks from a stale run can recognize they're
+  // stale and no-op instead of forcing the screen forward after the fact.
+  let shotRunToken = 0;
+
+  function runShotPlan(plan) {
+    state.shotPlan = plan;
+    state.shotIndex = 0;
+    state.myShots = [];
+    state.peerShots = [];
+    countdownRunning = true;
+    const myToken = ++shotRunToken;
     if (!screens.capture.classList.contains('active')) goToScreen('capture');
-    const overlay = $('countdown-overlay');
-    if (value === 'capture') {
-      overlay.classList.remove('show');
-      const flash = $('flash');
-      flash.classList.remove('go');
-      void flash.offsetWidth;
-      flash.classList.add('go');
-      captureBoth();
-      countdownRunning = false;
-      return;
+    if (isSolo()) $('capture-stage').classList.add('solo'); else $('capture-stage').classList.remove('solo');
+
+    const ticks = ['3', '2', '1'];
+    ticks.forEach((label, i) => {
+      setTimeout(() => { if (myToken === shotRunToken) showCountdownTick(label); }, i * plan.countdownMs);
+    });
+
+    const captureStartDelay = ticks.length * plan.countdownMs;
+    for (let i = 0; i < plan.count; i++) {
+      setTimeout(() => { if (myToken === shotRunToken) captureOneShot(i, plan.count); }, captureStartDelay + i * plan.intervalMs);
     }
-    overlay.textContent = value;
+
+    const totalDelay = captureStartDelay + (plan.count - 1) * plan.intervalMs + 550;
+    setTimeout(() => {
+      if (myToken === shotRunToken) finalizeShots(plan.count);
+      countdownRunning = false;
+    }, totalDelay);
+  }
+
+  function showCountdownTick(label) {
+    const overlay = $('countdown-overlay');
+    overlay.textContent = label;
     overlay.classList.remove('show');
     void overlay.offsetWidth;
     overlay.classList.add('show');
   }
 
   /* ============ CAPTURE + CANVAS COMPOSITION ============ */
-  function squareCropFromVideo(videoEl, size) {
+  function squareCropFromVideo(videoEl, size, filterCss) {
     const c = document.createElement('canvas');
     c.width = size; c.height = size;
     const ctx = c.getContext('2d');
     const vw = videoEl.videoWidth || size, vh = videoEl.videoHeight || size;
     const side = Math.min(vw, vh);
     const sx = (vw - side) / 2, sy = (vh - side) / 2;
+    if (filterCss && filterCss !== 'none') ctx.filter = filterCss;
     // No mirroring here: both peers must draw each person in the same
     // "true" orientation, or the two independently-rendered keepsakes
     // would not match.
     ctx.drawImage(videoEl, sx, sy, side, side, 0, 0, size, size);
+    ctx.filter = 'none';
     return c;
   }
 
-  function captureBoth() {
+  function captureOneShot(index, total) {
+    if (index === 0) $('countdown-overlay').classList.remove('show');
+    const flash = $('flash');
+    flash.classList.remove('go');
+    void flash.offsetWidth;
+    flash.classList.add('go');
+
     const PHOTO_SIZE = 640;
-    const localShot = squareCropFromVideo($('local-video-2'), PHOTO_SIZE);
-    const remoteShot = state.remoteStream
-      ? squareCropFromVideo($('remote-video-2'), PHOTO_SIZE)
-      : localShot; // fallback so a solo test run doesn't crash
+    const filterCss = FILTER_PRESETS[state.filter].css;
+    state.myShots[index] = squareCropFromVideo($('local-video-2'), PHOTO_SIZE, filterCss);
 
-    // Host is always slot A (left/top), guest is always slot B — fixed by
-    // role, so both people's renders place each other identically.
-    const slotA = state.role === 'host' ? localShot : remoteShot;
-    const slotB = state.role === 'host' ? remoteShot : localShot;
+    if (!isSolo()) {
+      // Purely local — no pixel data ever crosses the wire, we just grab
+      // the already-live remote <video> the same way we grab our own.
+      state.peerShots[index] = state.remoteStream
+        ? squareCropFromVideo($('remote-video-2'), PHOTO_SIZE, filterCss)
+        : state.myShots[index]; // fallback so a solo-ish test run doesn't crash
+    }
+  }
 
-    renderResult(slotA, slotB);
+  function finalizeShots(total) {
+    const gridDef = GRID_LAYOUTS[state.grid];
+    let ordered;
+
+    if (isSolo()) {
+      ordered = state.myShots.slice(0, total);
+    } else {
+      // Host is always first-in-pair, guest second — generalized from the
+      // old fixed 2-slot convention so both people appear equally often
+      // and in temporal order across N shots.
+      ordered = [];
+      for (let i = 0; i < total; i++) {
+        const mine = state.myShots[i];
+        const theirs = state.peerShots[i];
+        const pair = state.role === 'host' ? [mine, theirs] : [theirs, mine];
+        ordered.push(pair[0], pair[1]);
+      }
+      ordered = ordered.slice(0, gridDef.count);
+    }
+
+    renderResult(ordered);
     setTimeout(() => goToScreen('result'), 550);
   }
 
@@ -504,15 +685,43 @@
     ctx.restore();
   }
 
+  // Shared helper: draw `photos` into the cells described by `gridDef`,
+  // where cells are normalized 0..1 coords relative to the (areaX, areaY,
+  // areaW, areaH) box. Used by every frame renderer that lays photos out
+  // in a literal grid (washi, filmstrip); scrapbook/heart have bespoke,
+  // non-grid compositions and don't use this helper.
+  function drawGridCells(ctx, areaX, areaY, areaW, areaH, gap, gridDef, photos) {
+    gridDef.cells.forEach((cell, i) => {
+      const photo = photos[i];
+      if (!photo) return;
+      const cx = areaX + cell.x * areaW + gap / 2;
+      const cy = areaY + cell.y * areaH + gap / 2;
+      const cw = cell.w * areaW - gap;
+      const ch = cell.h * areaH - gap;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(cx, cy, cw, ch);
+      ctx.clip();
+      const side = Math.min(photo.width, photo.height);
+      const sx = (photo.width - side) / 2, sy = (photo.height - side) / 2;
+      const scale = Math.max(cw / side, ch / side);
+      const dw = side * scale, dh = side * scale;
+      ctx.drawImage(photo, sx, sy, side, side, cx + (cw - dw) / 2, cy + (ch - dh) / 2, dw, dh);
+      ctx.restore();
+    });
+  }
+
+  const CAPTION_ALLOWANCE = { washi: 118, filmstrip: 110, scrapbook: 0, heart: 0 };
+
   /* ---------- 1. WASHI STRIP ----------
-     A tall photo-booth strip: two frames stacked full-bleed inside a white
+     A tall photo-booth strip: N frames stacked full-bleed inside a white
      card, a torn piece of washi tape at the top, and a flowing script
      caption underneath — the "dinner party" strip look. */
-  function renderWashiStrip(ctx, W, H, photoA, photoB, accentHex) {
+  function renderWashiStrip(ctx, W, H, photos, gridDef, accentHex) {
     const margin = 24;
-    const photoW = W - margin * 2;
     const gap = 10;
-    const photoH = (H - margin * 2 - gap * 3 - 118) / 2;
+    const areaW = W - margin * 2;
+    const areaH = H - margin * 2 - CAPTION_ALLOWANCE.washi;
 
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.18)';
@@ -522,19 +731,7 @@
     ctx.fill();
     ctx.restore();
 
-    [photoA, photoB].forEach((photo, i) => {
-      const y = margin + i * (photoH + gap);
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(margin, y, photoW, photoH);
-      ctx.clip();
-      const side = Math.min(photo.width, photo.height);
-      const sx = (photo.width - side) / 2, sy = (photo.height - side) / 2;
-      const scale = Math.max(photoW / side, photoH / side);
-      const dw = side * scale, dh = side * scale;
-      ctx.drawImage(photo, sx, sy, side, side, margin + (photoW - dw) / 2, y + (photoH - dh) / 2, dw, dh);
-      ctx.restore();
-    });
+    drawGridCells(ctx, margin, margin, areaW, areaH, gap, gridDef, photos);
 
     // torn washi tape across the top edge
     drawTapePiece(ctx, W / 2, margin - 2, 150, 34, -3, accentHex);
@@ -544,8 +741,8 @@
 
   /* ---------- 2. FILMSTRIP ----------
      Black film-reel bands with sprocket holes running along the top and
-     bottom, two frames side by side in the middle, and a circled "TEXT"
-     style stamped caption — the retro filmstrip collage look. */
+     bottom, N frames arranged in a grid in the middle, and a circled
+     "TEXT" style stamped caption — the retro filmstrip collage look. */
   function drawSprocketBand(ctx, x, y, w, h) {
     ctx.save();
     ctx.fillStyle = '#171310';
@@ -561,13 +758,11 @@
     ctx.restore();
   }
 
-  function renderFilmstrip(ctx, W, H, photoA, photoB, accentHex) {
+  function renderFilmstrip(ctx, W, H, photos, gridDef, accentHex) {
     const bandH = 30;
-    const margin = 0;
     const photoAreaY = bandH;
-    const photoAreaH = H - bandH * 2 - 110;
+    const photoAreaH = H - bandH * 2 - CAPTION_ALLOWANCE.filmstrip;
     const gap = 6;
-    const photoW = (W - gap) / 2;
 
     ctx.save();
     roundRectPath(ctx, 0, 0, W, H, 10);
@@ -575,30 +770,34 @@
     ctx.fill();
     ctx.restore();
 
-    [photoA, photoB].forEach((photo, i) => {
-      const x = i * (photoW + gap);
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(x, photoAreaY, photoW, photoAreaH);
-      ctx.clip();
-      ctx.filter = 'grayscale(0.35) contrast(1.05)';
-      const side = Math.min(photo.width, photo.height);
-      const sx = (photo.width - side) / 2, sy = (photo.height - side) / 2;
-      const scale = Math.max(photoW / side, photoAreaH / side);
-      const dw = side * scale, dh = side * scale;
-      ctx.drawImage(photo, sx, sy, side, side, x + (photoW - dw) / 2, photoAreaY + (photoAreaH - dh) / 2, dw, dh);
-      ctx.filter = 'none';
-      ctx.restore();
-    });
+    ctx.save();
+    ctx.filter = 'grayscale(0.35) contrast(1.05)';
+    drawGridCells(ctx, 0, photoAreaY, W, photoAreaH, gap, gridDef, photos);
+    ctx.restore();
 
-    // center seam
+    // seam lines at every internal cell boundary (looks like a contact
+    // sheet for grids bigger than a single 2-up split)
+    const xBoundaries = new Set();
+    const yBoundaries = new Set();
+    gridDef.cells.forEach((cell) => {
+      if (cell.x > 0) xBoundaries.add(cell.x);
+      if (cell.y > 0) yBoundaries.add(cell.y);
+    });
     ctx.save();
     ctx.strokeStyle = 'rgba(23,19,16,0.5)';
     ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(photoW + gap / 2, photoAreaY);
-    ctx.lineTo(photoW + gap / 2, photoAreaY + photoAreaH);
-    ctx.stroke();
+    xBoundaries.forEach((fx) => {
+      ctx.beginPath();
+      ctx.moveTo(fx * W, photoAreaY);
+      ctx.lineTo(fx * W, photoAreaY + photoAreaH);
+      ctx.stroke();
+    });
+    yBoundaries.forEach((fy) => {
+      ctx.beginPath();
+      ctx.moveTo(0, photoAreaY + fy * photoAreaH);
+      ctx.lineTo(W, photoAreaY + fy * photoAreaH);
+      ctx.stroke();
+    });
     ctx.restore();
 
     drawSprocketBand(ctx, 0, 0, W, bandH);
@@ -665,7 +864,7 @@
     ctx.restore();
   }
 
-  function renderScrapbookPop(ctx, W, H, photoA, photoB, accentHex) {
+  function renderScrapbookPop(ctx, W, H, photos, gridDef, accentHex) {
     roundRectPath(ctx, 0, 0, W, H, 26);
     ctx.fillStyle = '#FBF3DE';
     ctx.fill();
@@ -679,8 +878,12 @@
     ctx.restore();
 
     const size = W * 0.62;
-    drawTiltedPolaroid(ctx, W * 0.40, H * 0.36, size, -6, photoA, 14);
-    drawTiltedPolaroid(ctx, W * 0.62, H * 0.58, size, 5, photoB, 14);
+    if (photos.length > 1) {
+      drawTiltedPolaroid(ctx, W * 0.40, H * 0.36, size, -6, photos[0], 14);
+      drawTiltedPolaroid(ctx, W * 0.62, H * 0.58, size, 5, photos[1], 14);
+    } else {
+      drawTiltedPolaroid(ctx, W * 0.5, H * 0.42, size, -3, photos[0], 14);
+    }
 
     drawStar(ctx, W * 0.86, H * 0.16, 15, accentHex, -10);
     drawStar(ctx, W * 0.13, H * 0.82, 11, accentHex, 18);
@@ -733,7 +936,8 @@
   /* ---------- 4. HEART CUTOUT ----------
      The merged photo cropped into a heart shape with a dotted "stitched"
      outline and a little bow above it — cute rather than merely modern. */
-  function renderHeartCutout(ctx, W, H, photoA, photoB, accentHex) {
+  function renderHeartCutout(ctx, W, H, photos, gridDef, accentHex) {
+    const [photoA, photoB] = photos;
     const margin = 22;
     const boxSize = W - margin * 2;
     const capGap = 18;
@@ -779,26 +983,27 @@
   }
 
   const FRAME_RENDERERS = {
-    washi: { render: renderWashiStrip, height: (W) => Math.round(W * 1.62) },
-    filmstrip: { render: renderFilmstrip, height: (W) => Math.round(W * 0.72) },
-    scrapbook: { render: renderScrapbookPop, height: (W) => Math.round(W * 1.18) },
-    heart: { render: renderHeartCutout, height: (W) => Math.round(W * 1.18) }
+    washi:     { render: renderWashiStrip,   height: (W, g) => Math.round(W / g.aspect + CAPTION_ALLOWANCE.washi),     grids: 'any' },
+    filmstrip: { render: renderFilmstrip,    height: (W, g) => Math.round(W / g.aspect + CAPTION_ALLOWANCE.filmstrip), grids: 'any' },
+    scrapbook: { render: renderScrapbookPop, height: (W, g) => Math.round(W * 1.18),                                   grids: ['solo1', 'strip2', 'side2'] },
+    heart:     { render: renderHeartCutout,  height: (W, g) => Math.round(W * 1.18),                                   grids: ['strip2', 'side2'] }
   };
 
-  function renderResult(photoA, photoB) {
-    state.lastPhotoA = photoA;
-    state.lastPhotoB = photoB;
+  function renderResult(photos) {
+    state.lastPhotos = photos;
     const canvas = $('final-canvas');
     const accentHex = ACCENTS[state.accent] || ACCENTS.pink;
 
+    const gridDef = GRID_LAYOUTS[state.grid] || GRID_LAYOUTS.strip2;
     const config = FRAME_RENDERERS[state.shape] || FRAME_RENDERERS.washi;
     const W = 620;
-    const H = config.height(W);
+    const H = config.height(W, gridDef);
 
     const p = document.createElement('canvas');
     p.width = W; p.height = H;
     const ctx = p.getContext('2d');
-    config.render(ctx, W, H, photoA, photoB, accentHex);
+    config.render(ctx, W, H, photos, gridDef, accentHex);
+    drawStickers(ctx, W, H, state.stickers);
 
     // soft shadow + tiny rotation, exported with transparent padding
     const pad = 50;
@@ -814,15 +1019,17 @@
     ectx.shadowOffsetY = 12;
     ectx.drawImage(p, -W / 2, -H / 2);
     ectx.restore();
+
+    renderStickerLayer();
   }
 
   $('caption-input').addEventListener('input', (e) => {
     state.caption = e.target.value;
-    if (state.lastPhotoA) renderResult(state.lastPhotoA, state.lastPhotoB);
+    if (state.lastPhotos) renderResult(state.lastPhotos);
   });
   $('date-toggle').addEventListener('change', (e) => {
     state.showDate = e.target.checked;
-    if (state.lastPhotoA) renderResult(state.lastPhotoA, state.lastPhotoB);
+    if (state.lastPhotos) renderResult(state.lastPhotos);
   });
 
   $('download-btn').addEventListener('click', () => {
@@ -831,6 +1038,119 @@
     link.download = 'polaroid-love.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
+  });
+
+  /* ============ STICKER DECORATION (result screen) ============ */
+  let selectedStickerId = null;
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+  function drawStickers(ctx, W, H, stickers) {
+    stickers.forEach((s) => {
+      ctx.save();
+      ctx.translate(s.x * W, s.y * H);
+      ctx.rotate((s.rotation * Math.PI) / 180);
+      ctx.scale(s.scale, s.scale);
+      ctx.font = "40px 'Poppins', sans-serif";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(s.emoji, 0, 0);
+      ctx.restore();
+    });
+  }
+
+  function renderStickerLayer() {
+    const layer = $('sticker-layer');
+    const canvas = $('final-canvas');
+    layer.innerHTML = '';
+    const rect = canvas.getBoundingClientRect();
+    const wrapRect = layer.parentElement.getBoundingClientRect();
+    // Canvas is padded/rotated for export; stickers are authored in the
+    // pre-padding W×H space, so anchor the overlay to the canvas's own
+    // rendered box (which already accounts for that padding via CSS sizing).
+    state.stickers.forEach((s) => {
+      const el = document.createElement('div');
+      el.className = 'sticker-el';
+      el.dataset.id = s.id;
+      el.textContent = s.emoji;
+      el.style.left = `${(rect.left - wrapRect.left) + s.x * rect.width}px`;
+      el.style.top = `${(rect.top - wrapRect.top) + s.y * rect.height}px`;
+      el.style.transform = `translate(-50%,-50%) rotate(${s.rotation}deg) scale(${s.scale})`;
+      el.classList.toggle('selected', s.id === selectedStickerId);
+      layer.appendChild(el);
+    });
+    renderStickerToolbar();
+  }
+
+  function renderStickerToolbar() {
+    const toolbar = $('sticker-toolbar');
+    if (!selectedStickerId || !state.stickers.find((s) => s.id === selectedStickerId)) {
+      toolbar.hidden = true;
+      return;
+    }
+    const layer = $('sticker-layer');
+    const el = layer.querySelector(`.sticker-el[data-id="${selectedStickerId}"]`);
+    if (!el) { toolbar.hidden = true; return; }
+    toolbar.hidden = false;
+    toolbar.style.left = el.style.left;
+    toolbar.style.top = `calc(${el.style.top} - 44px)`;
+  }
+
+  function addSticker(emoji) {
+    const id = `stk-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    // Nudge each new sticker's spawn point so a run of taps doesn't stack
+    // every sticker exactly on top of the last (which made the selected
+    // one's floating toolbar cover, and block clicks to, the one beneath it).
+    const n = state.stickers.length;
+    const x = clamp01(0.5 + ((n % 3) - 1) * 0.12);
+    const y = clamp01(0.4 + Math.floor(n / 3) * 0.1);
+    state.stickers.push({ id, emoji, x, y, scale: 1, rotation: 0 });
+    selectedStickerId = id;
+    renderResult(state.lastPhotos);
+  }
+
+  document.querySelectorAll('.sticker-pick').forEach((btn) => {
+    btn.addEventListener('click', () => addSticker(btn.dataset.emoji));
+  });
+
+  let dragState = null;
+  $('sticker-layer').addEventListener('pointerdown', (e) => {
+    const el = e.target.closest('.sticker-el');
+    if (!el) return;
+    el.setPointerCapture(e.pointerId);
+    selectedStickerId = el.dataset.id;
+    const s = state.stickers.find((x) => x.id === selectedStickerId);
+    dragState = { id: s.id, startClientX: e.clientX, startClientY: e.clientY, origX: s.x, origY: s.y };
+    renderStickerLayer();
+  });
+  $('sticker-layer').addEventListener('pointermove', (e) => {
+    if (!dragState) return;
+    const rect = $('final-canvas').getBoundingClientRect();
+    const dxNorm = (e.clientX - dragState.startClientX) / rect.width;
+    const dyNorm = (e.clientY - dragState.startClientY) / rect.height;
+    const s = state.stickers.find((x) => x.id === dragState.id);
+    if (!s) return;
+    s.x = clamp01(dragState.origX + dxNorm);
+    s.y = clamp01(dragState.origY + dyNorm);
+    renderStickerLayer();
+  });
+  $('sticker-layer').addEventListener('pointerup', () => {
+    if (dragState) { dragState = null; renderResult(state.lastPhotos); }
+  });
+
+  $('sticker-toolbar').addEventListener('click', (e) => {
+    const action = e.target.closest('button')?.dataset.action;
+    if (!action) return;
+    const s = state.stickers.find((x) => x.id === selectedStickerId);
+    if (!s) return;
+    if (action === 'grow') s.scale = Math.min(3, s.scale + 0.15);
+    if (action === 'shrink') s.scale = Math.max(0.3, s.scale - 0.15);
+    if (action === 'rotate-ccw') s.rotation -= 15;
+    if (action === 'rotate-cw') s.rotation += 15;
+    if (action === 'delete') {
+      state.stickers = state.stickers.filter((x) => x.id !== selectedStickerId);
+      selectedStickerId = null;
+    }
+    renderResult(state.lastPhotos);
   });
 
   /* ============ COPY CODE / LINK ============ */
@@ -862,10 +1182,19 @@
     state.myReady = false;
     state.peerReady = false;
     state.peerConnected = false;
+    state.mode = 'together';
+    state.shotPlan = null;
+    state.shotIndex = 0;
+    state.myShots = [];
+    state.peerShots = [];
+    state.lastPhotos = null;
+    state.stickers = [];
     countdownRunning = false;
     $('ready-btn').disabled = false;
     $('ready-btn').textContent = "I'm ready 📸";
     $('topbar-status').hidden = true;
+    $('remote-video-box').hidden = false;
+    $('capture-stage').classList.remove('solo');
   }
 
   $('lobby-leave-btn').addEventListener('click', () => {

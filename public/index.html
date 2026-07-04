@@ -51,6 +51,11 @@
             <span class="choice-title">Join a room</span>
             <span class="choice-sub">Got a code from your person? Enter it here</span>
           </button>
+          <button class="choice-card" id="mode-solo" data-mode="solo">
+            <span class="choice-icon">🤳</span>
+            <span class="choice-title">Take photos alone</span>
+            <span class="choice-sub">Just you and your camera, no code needed</span>
+          </button>
         </div>
 
         <div id="guest-code-row" class="field-row" hidden>
@@ -63,49 +68,96 @@
       </div>
     </section>
 
-    <!-- ============ SCREEN: DESIGN (host only) ============ -->
+    <!-- ============ SCREEN: DESIGN (host/solo only) ============ -->
     <section class="screen" id="screen-design">
       <h2 class="screen-title">Pick a look <span class="script">for us</span></h2>
       <p class="screen-sub">You're choosing for both of you — your partner will see the same frame.</p>
 
-      <h3 class="group-label">Frame shape</h3>
-      <div class="shape-grid" id="shape-grid">
-        <button class="shape-card selected" data-shape="washi">
-          <span class="shape-preview shape-preview--washi"><span></span><span></span><i class="tape"></i></span>
-          Washi Strip
-        </button>
-        <button class="shape-card" data-shape="filmstrip">
-          <span class="shape-preview shape-preview--filmstrip"><i class="sprocket top"></i><span></span><span></span><i class="sprocket bottom"></i></span>
-          Filmstrip
-        </button>
-        <button class="shape-card" data-shape="scrapbook">
-          <span class="shape-preview shape-preview--scrapbook"><span></span><span></span><i class="star">✦</i></span>
-          Scrapbook Pop
-        </button>
-        <button class="shape-card" data-shape="heart">
-          <span class="shape-preview shape-preview--heart"><span></span></span>
-          Heart Cutout
-        </button>
-      </div>
+      <div class="design-columns">
+        <div class="design-col">
+          <h3 class="group-label">Grid layout</h3>
+          <div class="grid-grid" id="grid-grid">
+            <button class="grid-card" data-grid="solo1">
+              <span class="grid-preview grid-preview--solo1"><span></span></span>
+              1 photo
+            </button>
+            <button class="grid-card selected" data-grid="strip2">
+              <span class="grid-preview grid-preview--strip2"><span></span><span></span></span>
+              2 photos
+            </button>
+            <button class="grid-card" data-grid="side2">
+              <span class="grid-preview grid-preview--side2"><span></span><span></span></span>
+              2 photos (side by side)
+            </button>
+            <button class="grid-card" data-grid="strip3">
+              <span class="grid-preview grid-preview--strip3"><span></span><span></span><span></span></span>
+              3 photos
+            </button>
+            <button class="grid-card" data-grid="strip4">
+              <span class="grid-preview grid-preview--strip4"><span></span><span></span><span></span><span></span></span>
+              4 photos
+            </button>
+            <button class="grid-card" data-grid="grid9">
+              <span class="grid-preview grid-preview--grid9">
+                <span></span><span></span><span></span>
+                <span></span><span></span><span></span>
+                <span></span><span></span><span></span>
+              </span>
+              9 photos
+            </button>
+          </div>
 
-      <h3 class="group-label">Accent color</h3>
-      <div class="color-row" id="color-row">
-        <button class="color-swatch selected" data-color="pink" style="--sw:#E7657F;"><span class="sr-only">Pink</span></button>
-        <button class="color-swatch" data-color="sky" style="--sw:#2E93AD;"><span class="sr-only">Sky</span></button>
-        <button class="color-swatch" data-color="leaf" style="--sw:#3F8A2E;"><span class="sr-only">Leaf</span></button>
-      </div>
+          <h3 class="group-label">Frame shape</h3>
+          <div class="shape-grid" id="shape-grid">
+            <button class="shape-card selected" data-shape="washi">
+              <span class="shape-preview shape-preview--washi"><span></span><span></span><i class="tape"></i></span>
+              Washi Strip
+            </button>
+            <button class="shape-card" data-shape="filmstrip">
+              <span class="shape-preview shape-preview--filmstrip"><i class="sprocket top"></i><span></span><span></span><i class="sprocket bottom"></i></span>
+              Filmstrip
+            </button>
+            <button class="shape-card" data-shape="scrapbook">
+              <span class="shape-preview shape-preview--scrapbook"><span></span><span></span><i class="star">✦</i></span>
+              Scrapbook Pop
+            </button>
+            <button class="shape-card" data-shape="heart">
+              <span class="shape-preview shape-preview--heart"><span></span></span>
+              Heart Cutout
+            </button>
+          </div>
+        </div>
 
-      <div id="split-row" style="display:none;">
-        <h3 class="group-label">Split direction</h3>
-        <div class="split-options">
-          <button class="split-opt selected" data-split="side">
-            <span class="split-icon side"><i></i><i></i></span>
-            Side by side
-          </button>
-          <button class="split-opt" data-split="top">
-            <span class="split-icon top"><i></i><i></i></span>
-            Top &amp; bottom
-          </button>
+        <div class="design-col">
+          <h3 class="group-label">Filter</h3>
+          <div class="filter-row" id="filter-row">
+            <button class="filter-pill selected" data-filter="none">None</button>
+            <button class="filter-pill" data-filter="vintage">Vintage</button>
+            <button class="filter-pill" data-filter="bw">B &amp; W</button>
+            <button class="filter-pill" data-filter="warm">Warm</button>
+            <button class="filter-pill" data-filter="cool">Cool</button>
+          </div>
+
+          <h3 class="group-label">Accent color</h3>
+          <div class="color-row" id="color-row">
+            <button class="color-swatch selected" data-color="pink" style="--sw:#E7657F;"><span class="sr-only">Pink</span></button>
+            <button class="color-swatch" data-color="sky" style="--sw:#2E93AD;"><span class="sr-only">Sky</span></button>
+            <button class="color-swatch" data-color="leaf" style="--sw:#3F8A2E;"><span class="sr-only">Leaf</span></button>
+          </div>
+
+          <div id="split-row" style="display:none;">
+            <h3 class="group-label">Split direction</h3>
+            <div class="split-options">
+              <button class="split-opt selected" data-split="side">
+                <span class="split-icon side"><i></i><i></i></span>
+                Side by side
+              </button>
+              <button class="split-opt" data-split="top">
+                <span class="split-icon top"><i></i><i></i></span>
+                Top &amp; bottom
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -159,7 +211,7 @@
 
     <!-- ============ SCREEN: CAPTURE (countdown + shutter) ============ -->
     <section class="screen" id="screen-capture">
-      <div class="capture-stage">
+      <div class="capture-stage" id="capture-stage">
         <video id="local-video-2" autoplay playsinline muted></video>
         <video id="remote-video-2" autoplay playsinline></video>
         <div class="countdown-overlay" id="countdown-overlay"></div>
@@ -170,7 +222,28 @@
     <!-- ============ SCREEN: RESULT ============ -->
     <section class="screen" id="screen-result">
       <h2 class="screen-title">Yours to keep <span class="script">forever</span></h2>
-      <div class="result-canvas-wrap"><canvas id="final-canvas"></canvas></div>
+      <div class="result-canvas-wrap">
+        <canvas id="final-canvas"></canvas>
+        <div class="sticker-layer" id="sticker-layer"></div>
+        <div class="sticker-toolbar" id="sticker-toolbar" hidden>
+          <button data-action="shrink" title="Smaller">−</button>
+          <button data-action="grow" title="Bigger">+</button>
+          <button data-action="rotate-ccw" title="Rotate left">↺</button>
+          <button data-action="rotate-cw" title="Rotate right">↻</button>
+          <button data-action="delete" title="Remove">×</button>
+        </div>
+      </div>
+
+      <div class="sticker-picker" id="sticker-picker">
+        <button class="sticker-pick" data-emoji="❤️">❤️</button>
+        <button class="sticker-pick" data-emoji="⭐">⭐</button>
+        <button class="sticker-pick" data-emoji="✨">✨</button>
+        <button class="sticker-pick" data-emoji="🎀">🎀</button>
+        <button class="sticker-pick" data-emoji="🌸">🌸</button>
+        <button class="sticker-pick" data-emoji="😂">😂</button>
+        <button class="sticker-pick" data-emoji="🥂">🥂</button>
+        <button class="sticker-pick" data-emoji="💌">💌</button>
+      </div>
 
       <div class="caption-editor">
         <input type="text" id="caption-input" maxlength="40" placeholder="Add a caption, e.g. us ♡">
