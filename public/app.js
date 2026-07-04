@@ -50,7 +50,6 @@
     showDate: true,
 
     // multi-shot capture runtime state
-    shotPlan: null,
     shotIndex: 0,
     myShots: [],
     peerShots: [],
@@ -198,15 +197,6 @@
     });
   });
 
-  document.querySelectorAll('.filter-pill').forEach((pill) => {
-    pill.addEventListener('click', () => {
-      state.filter = pill.dataset.filter;
-      document.querySelectorAll('.filter-pill').forEach((p) => p.classList.remove('selected'));
-      pill.classList.add('selected');
-      applyLiveFilterToVideos();
-    });
-  });
-
   document.querySelectorAll('.color-swatch').forEach((sw) => {
     sw.addEventListener('click', () => {
       state.accent = sw.dataset.color;
@@ -267,19 +257,11 @@
       $('local-video').srcObject = stream;
       $('local-video-2').srcObject = stream;
       $('camera-error').classList.remove('show');
-      applyLiveFilterToVideos();
       return stream;
     } catch (e) {
       $('camera-error').classList.add('show');
       throw e;
     }
-  }
-
-  function applyLiveFilterToVideos() {
-    const css = FILTER_PRESETS[state.filter].css;
-    ['local-video', 'local-video-2', 'remote-video', 'remote-video-2'].forEach((id) => {
-      $(id).style.filter = css;
-    });
   }
 
   function attachRemoteStream(stream) {
@@ -331,7 +313,7 @@
     peer.on('connection', (conn) => {
       state.dataConn = conn;
       conn.on('open', () => {
-        conn.send({ type: 'config', shape: state.shape, accent: state.accent, split: state.split, grid: state.grid, filter: state.filter });
+        conn.send({ type: 'config', shape: state.shape, accent: state.accent, split: state.split, grid: state.grid });
       });
       conn.on('data', handleData);
       conn.on('close', handlePartnerLeft);
@@ -386,6 +368,7 @@
 
   /* ============ SOLO SESSION (no PeerJS, no room code) ============ */
   async function startSoloSession() {
+    $('lobby-title').textContent = 'Get ready';
     $('host-code-card').hidden = true;
     $('join-status-card').hidden = true;
     $('remote-video-box').hidden = true;
@@ -409,96 +392,138 @@
         state.accent = msg.accent;
         state.split = msg.split;
         state.grid = msg.grid || state.grid;
-        state.filter = msg.filter || state.filter;
-        applyLiveFilterToVideos();
+        break;
+      case 'filter':
+        // Either side can change the filter after capture; keep both
+        // people's result screens showing an identical final image.
+        state.filter = msg.filter;
+        document.querySelectorAll('.filter-pill').forEach((p) => p.classList.toggle('selected', p.dataset.filter === state.filter));
+        if (state.lastPhotos) renderResult(state.lastPhotos);
         break;
       case 'ready':
         state.peerReady = !!msg.value;
         updateReadyHint();
-        if (state.role === 'host') maybeStartCountdown();
+        if (state.role === 'host') maybeStartShot();
         break;
-      case 'shotplan':
-        runShotPlan(msg);
+      case 'takeshot':
+        runOneShot(msg);
         break;
       default:
         break;
     }
   }
 
-  /* ============ READY / SHOT-PLAN SYNC ============ */
-  $('ready-btn').addEventListener('click', () => {
+  /* ============ READY / PER-SHOT SYNC ============ */
+  // Every shot — the first and every subsequent one in a multi-photo grid —
+  // requires a fresh "ready" from both sides (or from the solo photographer)
+  // before its own countdown starts. Nobody is auto-advanced through a
+  // burst; each shot is its own deliberate beat.
+  function clickReady() {
     state.myReady = true;
-    $('ready-btn').disabled = true;
-    $('ready-btn').textContent = isSolo() ? 'Starting…' : 'Waiting for them…';
+    setReadyButtonsDisabled(true);
+    setReadyButtonsLabel(isSolo() ? 'Starting…' : 'Waiting for them…');
     if (isSolo()) {
-      const grid = GRID_LAYOUTS[state.grid];
-      runShotPlan({ count: grid.count, intervalMs: 1200, countdownMs: 700, t0: performance.now() });
+      runOneShot({ countdownMs: 700, t0: performance.now() });
     } else {
       sendData({ type: 'ready', value: true });
       updateReadyHint();
-      if (state.role === 'host') maybeStartCountdown();
+      if (state.role === 'host') maybeStartShot();
     }
-  });
+  }
+  $('ready-btn').addEventListener('click', clickReady);
+  $('ready-btn-capture').addEventListener('click', clickReady);
+
+  function setReadyButtonsDisabled(disabled) {
+    $('ready-btn').disabled = disabled;
+    $('ready-btn-capture').disabled = disabled;
+  }
+  function setReadyButtonsLabel(text) {
+    $('ready-btn').textContent = text;
+    $('ready-btn-capture').textContent = text;
+  }
 
   function updateReadyHint() {
-    if (state.myReady && state.peerReady) {
-      $('ready-hint').textContent = "Get close together — here we go!";
-    } else if (state.myReady) {
-      $('ready-hint').textContent = 'Waiting for them to hit ready too…';
-    } else {
-      $('ready-hint').textContent = 'Waiting for both of you to be ready…';
-    }
+    const hint = state.myReady && state.peerReady
+      ? 'Get close together — here we go!'
+      : state.myReady
+        ? 'Waiting for them to hit ready too…'
+        : 'Waiting for both of you to be ready…';
+    $('ready-hint').textContent = hint;
+    $('ready-hint-capture').textContent = hint;
   }
 
   let countdownRunning = false;
-  function maybeStartCountdown() {
-    // Only the host ever drives the shot plan, so both sides never race
-    // to lead it at the same time.
+  function maybeStartShot() {
+    // Only the host ever drives a shot, so both sides never race to lead
+    // the same countdown.
     if (countdownRunning) return;
     if (!(state.myReady && state.peerReady)) return;
-    const grid = GRID_LAYOUTS[state.grid];
-    const plan = { type: 'shotplan', count: grid.count, intervalMs: 1200, countdownMs: 700, t0: performance.now() };
+    const plan = { type: 'takeshot', countdownMs: 700, t0: performance.now() };
     sendData(plan);
-    runShotPlan(plan);
+    runOneShot(plan);
   }
 
-  // Shared entry point for BOTH together-mode (networked, one 'shotplan'
-  // message drives both sides) and solo-mode (built locally, no network).
-  // Each side anchors timing to ITS OWN clock read here rather than trying
-  // to translate the sender's t0 onto its own clock — the guest's shots
-  // land roughly one network-hop-latency later than the host's, which is
-  // imperceptible for a couples photo and avoids NTP-style offset
-  // correlation entirely.
+  // Shared entry point for BOTH together-mode (networked, one 'takeshot'
+  // message drives both sides for this single shot) and solo-mode (built
+  // locally, no network). Each side anchors timing to ITS OWN clock read
+  // here rather than trying to translate the sender's t0 onto its own
+  // clock — the guest's shot lands roughly one network-hop-latency later
+  // than the host's, imperceptible for a couples photo, avoiding NTP-style
+  // offset correlation entirely.
   // Bumped every time a run is aborted (partner disconnect) so any already-
   // scheduled setTimeout callbacks from a stale run can recognize they're
   // stale and no-op instead of forcing the screen forward after the fact.
   let shotRunToken = 0;
 
-  function runShotPlan(plan) {
-    state.shotPlan = plan;
-    state.shotIndex = 0;
-    state.myShots = [];
-    state.peerShots = [];
+  function runOneShot(plan) {
     countdownRunning = true;
     const myToken = ++shotRunToken;
     if (!screens.capture.classList.contains('active')) goToScreen('capture');
     if (isSolo()) $('capture-stage').classList.add('solo'); else $('capture-stage').classList.remove('solo');
+    updateShotProgress();
 
     const ticks = ['3', '2', '1'];
     ticks.forEach((label, i) => {
       setTimeout(() => { if (myToken === shotRunToken) showCountdownTick(label); }, i * plan.countdownMs);
     });
 
-    const captureStartDelay = ticks.length * plan.countdownMs;
-    for (let i = 0; i < plan.count; i++) {
-      setTimeout(() => { if (myToken === shotRunToken) captureOneShot(i, plan.count); }, captureStartDelay + i * plan.intervalMs);
-    }
-
-    const totalDelay = captureStartDelay + (plan.count - 1) * plan.intervalMs + 550;
+    const captureDelay = ticks.length * plan.countdownMs;
     setTimeout(() => {
-      if (myToken === shotRunToken) finalizeShots(plan.count);
+      if (myToken !== shotRunToken) return;
+      captureOneShot(state.shotIndex, GRID_LAYOUTS[state.grid].count);
+      state.shotIndex++;
+      state.myReady = false;
+      state.peerReady = false;
       countdownRunning = false;
-    }, totalDelay);
+
+      const total = GRID_LAYOUTS[state.grid].count;
+      setTimeout(() => {
+        if (myToken !== shotRunToken) return;
+        if (state.shotIndex >= total) {
+          finalizeShots(total);
+        } else {
+          // More shots left in this grid — reset for the next ready beat
+          // instead of auto-advancing.
+          setReadyButtonsDisabled(false);
+          setReadyButtonsLabel("I'm ready 📸");
+          updateReadyHint();
+          $('ready-row-capture').hidden = false;
+          updateShotProgress();
+        }
+      }, 550);
+    }, captureDelay);
+  }
+
+  function updateShotProgress() {
+    const total = GRID_LAYOUTS[state.grid].count;
+    const current = Math.min(state.shotIndex + 1, total);
+    const el = $('shot-progress');
+    if (total > 1) {
+      el.hidden = false;
+      el.textContent = `Photo ${current} of ${total}`;
+    } else {
+      el.hidden = true;
+    }
   }
 
   function showCountdownTick(label) {
@@ -510,19 +535,20 @@
   }
 
   /* ============ CAPTURE + CANVAS COMPOSITION ============ */
-  function squareCropFromVideo(videoEl, size, filterCss) {
+  // Captures are always taken raw/unfiltered — the filter is a post-capture
+  // choice applied at render time (see applyFilterToPhoto), so changing it
+  // later can be redone non-destructively against the original shots.
+  function squareCropFromVideo(videoEl, size) {
     const c = document.createElement('canvas');
     c.width = size; c.height = size;
     const ctx = c.getContext('2d');
     const vw = videoEl.videoWidth || size, vh = videoEl.videoHeight || size;
     const side = Math.min(vw, vh);
     const sx = (vw - side) / 2, sy = (vh - side) / 2;
-    if (filterCss && filterCss !== 'none') ctx.filter = filterCss;
     // No mirroring here: both peers must draw each person in the same
     // "true" orientation, or the two independently-rendered keepsakes
     // would not match.
     ctx.drawImage(videoEl, sx, sy, side, side, 0, 0, size, size);
-    ctx.filter = 'none';
     return c;
   }
 
@@ -534,14 +560,13 @@
     flash.classList.add('go');
 
     const PHOTO_SIZE = 640;
-    const filterCss = FILTER_PRESETS[state.filter].css;
-    state.myShots[index] = squareCropFromVideo($('local-video-2'), PHOTO_SIZE, filterCss);
+    state.myShots[index] = squareCropFromVideo($('local-video-2'), PHOTO_SIZE);
 
     if (!isSolo()) {
       // Purely local — no pixel data ever crosses the wire, we just grab
       // the already-live remote <video> the same way we grab our own.
       state.peerShots[index] = state.remoteStream
-        ? squareCropFromVideo($('remote-video-2'), PHOTO_SIZE, filterCss)
+        ? squareCropFromVideo($('remote-video-2'), PHOTO_SIZE)
         : state.myShots[index]; // fallback so a solo-ish test run doesn't crash
     }
   }
@@ -566,6 +591,8 @@
       ordered = ordered.slice(0, gridDef.count);
     }
 
+    $('ready-row-capture').hidden = true;
+    $('shot-progress').hidden = true;
     renderResult(ordered);
     setTimeout(() => goToScreen('result'), 550);
   }
@@ -989,6 +1016,20 @@
     heart:     { render: renderHeartCutout,  height: (W, g) => Math.round(W * 1.18),                                   grids: ['strip2', 'side2'] }
   };
 
+  // Non-destructively re-applies the currently chosen filter to a raw
+  // (always-unfiltered) captured photo — called fresh every render so
+  // switching filters after the fact never compounds onto a previous pass.
+  function applyFilterToPhoto(photo) {
+    const css = FILTER_PRESETS[state.filter].css;
+    if (css === 'none') return photo;
+    const c = document.createElement('canvas');
+    c.width = photo.width; c.height = photo.height;
+    const ctx = c.getContext('2d');
+    ctx.filter = css;
+    ctx.drawImage(photo, 0, 0);
+    return c;
+  }
+
   function renderResult(photos) {
     state.lastPhotos = photos;
     const canvas = $('final-canvas');
@@ -999,10 +1040,12 @@
     const W = 620;
     const H = config.height(W, gridDef);
 
+    const filteredPhotos = photos.map(applyFilterToPhoto);
+
     const p = document.createElement('canvas');
     p.width = W; p.height = H;
     const ctx = p.getContext('2d');
-    config.render(ctx, W, H, photos, gridDef, accentHex);
+    config.render(ctx, W, H, filteredPhotos, gridDef, accentHex);
     drawStickers(ctx, W, H, state.stickers);
 
     // soft shadow + tiny rotation, exported with transparent padding
@@ -1032,6 +1075,20 @@
     if (state.lastPhotos) renderResult(state.lastPhotos);
   });
 
+  // Filter is chosen AFTER the photos are captured, applied at render time
+  // to the raw (unfiltered) shots — never baked in during capture. In
+  // together-mode this syncs to the partner so both keep an identical
+  // final image, matching how the frame/grid choices synced before capture.
+  document.querySelectorAll('.filter-pill').forEach((pill) => {
+    pill.addEventListener('click', () => {
+      state.filter = pill.dataset.filter;
+      document.querySelectorAll('.filter-pill').forEach((p) => p.classList.remove('selected'));
+      pill.classList.add('selected');
+      if (!isSolo()) sendData({ type: 'filter', filter: state.filter });
+      if (state.lastPhotos) renderResult(state.lastPhotos);
+    });
+  });
+
   $('download-btn').addEventListener('click', () => {
     const canvas = $('final-canvas');
     const link = document.createElement('a');
@@ -1041,8 +1098,54 @@
   });
 
   /* ============ STICKER DECORATION (result screen) ============ */
+  // A wide, curated emoji set stands in for a "sticker pack" here — it
+  // renders natively and identically across browsers/OSes with zero extra
+  // asset files, network requests, or licensing to track, which matters
+  // for an app whose whole design premise is running fully self-hosted.
+  const STICKER_CATEGORIES = [
+    { key: 'love', label: 'Love', emojis: ['❤️', '🩷', '🧡', '💛', '💚', '💙', '💜', '🤍', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '😍', '🥰', '😘', '💋', '💌'] },
+    { key: 'party', label: 'Party', emojis: ['🎉', '🎊', '🥳', '🎈', '🎁', '🥂', '🍾', '✨', '🎇', '🎆', '🪩', '🎶', '🎵', '📸', '💃', '🕺'] },
+    { key: 'cute', label: 'Cute', emojis: ['🌸', '🌷', '🌻', '🌈', '⭐', '🌟', '💫', '☁️', '🦋', '🐰', '🐻', '🐶', '🐱', '🐼', '🦄', '🐣'] },
+    { key: 'food', label: 'Food', emojis: ['🍰', '🧁', '🍓', '🍒', '🍑', '🍩', '🍪', '🍫', '🍦', '🍿', '☕', '🍹', '🍕', '🍉'] },
+    { key: 'fun', label: 'Fun', emojis: ['😂', '😎', '🤪', '😜', '🥹', '😆', '🙈', '👀', '👍', '🤙', '✌️', '👑', '💯', '🔥'] }
+  ];
+  let selectedStickerCategory = STICKER_CATEGORIES[0].key;
   let selectedStickerId = null;
   const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+  function renderStickerCategoryTabs() {
+    const wrap = $('sticker-categories');
+    wrap.innerHTML = '';
+    STICKER_CATEGORIES.forEach((cat) => {
+      const btn = document.createElement('button');
+      btn.className = 'sticker-cat' + (cat.key === selectedStickerCategory ? ' selected' : '');
+      btn.textContent = cat.label;
+      btn.dataset.cat = cat.key;
+      btn.addEventListener('click', () => {
+        selectedStickerCategory = cat.key;
+        renderStickerCategoryTabs();
+        renderStickerPickerGrid();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function renderStickerPickerGrid() {
+    const picker = $('sticker-picker');
+    picker.innerHTML = '';
+    const cat = STICKER_CATEGORIES.find((c) => c.key === selectedStickerCategory) || STICKER_CATEGORIES[0];
+    cat.emojis.forEach((emoji) => {
+      const btn = document.createElement('button');
+      btn.className = 'sticker-pick';
+      btn.textContent = emoji;
+      btn.dataset.emoji = emoji;
+      btn.addEventListener('click', () => addSticker(emoji));
+      picker.appendChild(btn);
+    });
+  }
+
+  renderStickerCategoryTabs();
+  renderStickerPickerGrid();
 
   function drawStickers(ctx, W, H, stickers) {
     stickers.forEach((s) => {
@@ -1107,10 +1210,6 @@
     selectedStickerId = id;
     renderResult(state.lastPhotos);
   }
-
-  document.querySelectorAll('.sticker-pick').forEach((btn) => {
-    btn.addEventListener('click', () => addSticker(btn.dataset.emoji));
-  });
 
   let dragState = null;
   $('sticker-layer').addEventListener('pointerdown', (e) => {
@@ -1183,18 +1282,21 @@
     state.peerReady = false;
     state.peerConnected = false;
     state.mode = 'together';
-    state.shotPlan = null;
     state.shotIndex = 0;
     state.myShots = [];
     state.peerShots = [];
     state.lastPhotos = null;
     state.stickers = [];
     countdownRunning = false;
-    $('ready-btn').disabled = false;
-    $('ready-btn').textContent = "I'm ready 📸";
+    shotRunToken++;
+    setReadyButtonsDisabled(false);
+    setReadyButtonsLabel("I'm ready 📸");
+    $('ready-row-capture').hidden = true;
+    $('shot-progress').hidden = true;
     $('topbar-status').hidden = true;
     $('remote-video-box').hidden = false;
     $('capture-stage').classList.remove('solo');
+    $('lobby-title').textContent = 'Your room code';
   }
 
   $('lobby-leave-btn').addEventListener('click', () => {

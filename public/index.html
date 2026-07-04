@@ -129,15 +129,6 @@
         </div>
 
         <div class="design-col">
-          <h3 class="group-label">Filter</h3>
-          <div class="filter-row" id="filter-row">
-            <button class="filter-pill selected" data-filter="none">None</button>
-            <button class="filter-pill" data-filter="vintage">Vintage</button>
-            <button class="filter-pill" data-filter="bw">B &amp; W</button>
-            <button class="filter-pill" data-filter="warm">Warm</button>
-            <button class="filter-pill" data-filter="cool">Cool</button>
-          </div>
-
           <h3 class="group-label">Accent color</h3>
           <div class="color-row" id="color-row">
             <button class="color-swatch selected" data-color="pink" style="--sw:#E7657F;"><span class="sr-only">Pink</span></button>
@@ -211,11 +202,17 @@
 
     <!-- ============ SCREEN: CAPTURE (countdown + shutter) ============ -->
     <section class="screen" id="screen-capture">
+      <p class="shot-progress" id="shot-progress" hidden>Photo 1 of 1</p>
       <div class="capture-stage" id="capture-stage">
         <video id="local-video-2" autoplay playsinline muted></video>
         <video id="remote-video-2" autoplay playsinline></video>
         <div class="countdown-overlay" id="countdown-overlay"></div>
         <div class="flash" id="flash"></div>
+      </div>
+
+      <div class="ready-row" id="ready-row-capture" hidden>
+        <button class="btn-primary" id="ready-btn-capture">I'm ready 📸</button>
+        <p class="ready-hint" id="ready-hint-capture">Waiting for both of you to be ready…</p>
       </div>
     </section>
 
@@ -234,16 +231,18 @@
         </div>
       </div>
 
-      <div class="sticker-picker" id="sticker-picker">
-        <button class="sticker-pick" data-emoji="❤️">❤️</button>
-        <button class="sticker-pick" data-emoji="⭐">⭐</button>
-        <button class="sticker-pick" data-emoji="✨">✨</button>
-        <button class="sticker-pick" data-emoji="🎀">🎀</button>
-        <button class="sticker-pick" data-emoji="🌸">🌸</button>
-        <button class="sticker-pick" data-emoji="😂">😂</button>
-        <button class="sticker-pick" data-emoji="🥂">🥂</button>
-        <button class="sticker-pick" data-emoji="💌">💌</button>
+      <h3 class="group-label">Filter</h3>
+      <div class="filter-row" id="filter-row">
+        <button class="filter-pill selected" data-filter="none">None</button>
+        <button class="filter-pill" data-filter="vintage">Vintage</button>
+        <button class="filter-pill" data-filter="bw">B &amp; W</button>
+        <button class="filter-pill" data-filter="warm">Warm</button>
+        <button class="filter-pill" data-filter="cool">Cool</button>
       </div>
+
+      <h3 class="group-label">Stickers</h3>
+      <div class="sticker-categories" id="sticker-categories"></div>
+      <div class="sticker-picker" id="sticker-picker"></div>
 
       <div class="caption-editor">
         <input type="text" id="caption-input" maxlength="40" placeholder="Add a caption, e.g. us ♡">

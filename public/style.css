@@ -59,6 +59,7 @@ body{
   display:flex;align-items:center;gap:7px;font-size:0.82rem;font-weight:600;
   background:var(--cream-soft);border-radius:100px;padding:6px 12px;box-shadow:var(--shadow-soft);
 }
+.topbar-status[hidden]{display:none;}
 .topbar-status .dot{width:8px;height:8px;border-radius:50%;background:#C94B4B;}
 .topbar-status.connected .dot{background:var(--leaf-deep);}
 .topbar-status.connecting .dot{background:var(--sky-deep);animation:pulse 1.2s ease-in-out infinite;}
@@ -302,6 +303,10 @@ body{
 .ready-hint{font-size:0.82rem;color:var(--ink-soft);margin-top:10px;}
 
 /* ---------------- Capture screen ---------------- */
+.shot-progress{
+  text-align:center;font-family:var(--font-display);font-weight:700;font-size:0.9rem;
+  color:var(--pink-button);margin:2px 0 0;
+}
 .capture-stage{
   position:relative;border-radius:var(--radius-lg);overflow:hidden;background:#000;
   aspect-ratio:3/4;margin-top:10px;box-shadow:var(--shadow-card);
@@ -342,15 +347,27 @@ body{
   position:absolute;display:flex;gap:4px;background:var(--ink);border-radius:100px;
   padding:6px;box-shadow:var(--shadow-card);transform:translateX(-50%);z-index:2;
 }
+.sticker-toolbar[hidden]{display:none;}
 .sticker-toolbar button{
   width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,0.12);
   color:#fff;font-size:0.95rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;
 }
 .sticker-toolbar button:hover{background:rgba(255,255,255,0.24);}
 
-.sticker-picker{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px;}
+.sticker-categories{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.sticker-cat{
+  background:var(--cream-soft);border:2px solid var(--line);border-radius:100px;
+  padding:6px 14px;font-family:var(--font-body);font-weight:700;font-size:0.78rem;
+  color:var(--ink-soft);cursor:pointer;
+}
+.sticker-cat.selected{border-color:var(--pink-button);color:var(--ink);background:var(--blush);}
+
+.sticker-picker{
+  display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px;
+  max-height:156px;overflow-y:auto;padding:2px;
+}
 .sticker-pick{
-  width:44px;height:44px;border-radius:50%;background:var(--cream-soft);border:2px solid var(--line);
+  width:44px;height:44px;flex:0 0 auto;border-radius:50%;background:var(--cream-soft);border:2px solid var(--line);
   font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-soft);
 }
 .sticker-pick:hover{border-color:var(--pink-button);}
